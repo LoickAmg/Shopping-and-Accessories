@@ -1,83 +1,208 @@
-# Étal
+# Shopping & Accessories
 
-Boutique en ligne complète, thémable et déployable gratuitement sur Vercel : catalogue, panier, comptes clients, commande avec réservation de stock, paiement par fournisseurs branchables, e-mail de confirmation et back-office.
+Boutique en ligne de sacs et d'accessoires de mode : vitrine immersive, catalogue, panier, comptes clients, commande avec réservation de stock, paiement et back-office. Le site se déploie gratuitement sur Vercel avec une base Postgres Neon.
 
-Le nom, l'identité visuelle, la devise et les fournisseurs de paiement se règlent par variables d'environnement : la même base sert une papeterie, une épicerie ou un atelier.
+- [Aperçu](#aperçu)
+- [Fonctionnalités](#fonctionnalités)
+- [Démarrer en local](#démarrer-en-local)
+- [Structure du projet](#structure-du-projet)
+- [Personnaliser la boutique](#personnaliser-la-boutique)
+- [Déployer sur Vercel](#déployer-sur-vercel)
+- [Variables d'environnement](#variables-denvironnement)
+- [Paiement](#paiement)
+- [Devises](#devises)
+- [Sécurité](#sécurité)
+- [Limites connues](#limites-connues)
 
-## Ce qu'elle fait
+## Aperçu
 
-- **Vitrine** : accueil éditorial, catalogue avec rayons, recherche insensible aux accents, tri, filtre « en stock », pagination, fiches produit avec données structurées, prix barrés.
-- **Panier** : sans compte (cookie), fusionné avec celui du compte à la connexion ; quantités plafonnées par le stock ; articles devenus indisponibles signalés.
-- **Commande** : validation côté serveur, adresse, paiement, conditions de vente acceptées. Le **stock est réservé** dans une transaction (`UPDATE … WHERE stock >= quantité`) : deux acheteurs ne peuvent jamais se partager la dernière pièce. Une commande impayée expire après 30 minutes (réglable) et rend son stock.
-- **Paiement** : interface `PaymentProvider` (deux méthodes). Fournisseurs livrés : `demo` (simulateur intégré) et `stripe` (Checkout, écrit sans SDK, signature de webhook vérifiée). Le montant et la devise encaissés doivent être exactement ceux de la commande ; un webhook rejoué n'a aucun effet.
-- **Comptes** : inscription, connexion, historique des commandes. Mots de passe hachés en `scrypt`, sessions à jeton haché, limitation de débit partagée en base.
-- **Back-office** (`/admin`, réservé au compte dont l'e-mail est `ADMIN_EMAIL`) : tableau de bord, produits (créer, modifier, archiver), rayons, commandes (expédier, annuler, marquer payée hors ligne, solder un remboursement).
-- **Pages légales** : mentions légales, conditions de vente, confidentialité et cookies, livraison et retours, contact, à propos ; l'identité du vendeur vient de l'environnement.
-- **Accessibilité et SEO** : navigation clavier, lien d'évitement, formulaires étiquetés avec erreurs annoncées, `robots.txt`, `sitemap.xml`, Open Graph.
+La direction artistique est noire, crème et or, avec des touches de beige et de rose poudré reprises du logo. Les titres sont en capitales condensées et la signature en écriture manuscrite.
+
+La page d'accueil se lit dans cet ordre :
+
+1. **Hero** : les photos des sacs recouvrent l'intérieur d'un dôme en fond. Le dôme dérive lentement, suit la souris et se fait glisser à la souris ou au doigt. Le titre s'écrit lettre par lettre.
+2. **Introduction** : une phrase dont les lettres s'allument au fil du défilement.
+3. **Anatomie d'une pièce** : quatre exigences (Matière, Ligne, Détail, Allure) en onglets qui avancent seuls. Chacune montre un sac et trois détails de fabrication.
+4. **Pièces phares** : un rail de fiches produit avec pastilles (Nouveau, remise, Épuisé), prix barré et ajout rapide au panier.
+5. **Collection** : une bannière qui met une pièce en avant.
+6. **Les rayons** : une vignette par rayon, avec son nombre de pièces.
+7. **La maison**, puis un **appel final** vers la boutique et le contact.
+
+Le menu en pilule suit la section affichée. Sur mobile, il passe en bas de l'écran.
+
+Les animations respectent le réglage « réduire les animations » du système. Sans JavaScript, tout le contenu reste lisible.
+
+## Fonctionnalités
+
+- **Catalogue** : rayons, recherche insensible aux accents, tri, filtre « en stock », pagination, prix barrés, fiches produit avec données structurées.
+- **Panier** : fonctionne sans compte (cookie) et fusionne avec celui du compte à la connexion. Les quantités sont plafonnées par le stock et les articles devenus indisponibles sont signalés.
+- **Commande** : validation côté serveur, adresse, choix du paiement, acceptation des conditions de vente.
+- **Stock** : il est réservé dans une transaction (`UPDATE … WHERE stock >= quantité`), donc deux acheteurs ne peuvent pas se partager la dernière pièce. Une commande impayée expire après 30 minutes (réglable) et rend son stock.
+- **Comptes clients** : inscription, connexion et historique des commandes. Les mots de passe sont hachés avec `scrypt`.
+- **Back-office** (`/admin`, réservé au compte dont l'e-mail est `ADMIN_EMAIL`) :
+  - tableau de bord ;
+  - produits (créer, modifier, archiver) et rayons ;
+  - commandes : expédier, annuler, enregistrer un paiement reçu hors ligne, solder un remboursement ;
+  - devises.
+- **Pages légales** : mentions légales, conditions de vente, confidentialité, livraison et retours, contact, à propos. L'identité du vendeur vient des variables d'environnement.
+- **Accessibilité et référencement** : navigation au clavier, lien d'évitement, formulaires étiquetés avec erreurs annoncées, `robots.txt`, `sitemap.xml`, Open Graph.
 
 ## Stack
 
-Next.js 16 (App Router, Server Actions), TypeScript strict, Postgres (Neon en production, PGlite en local et en test) avec Drizzle, Zod, CSS écrit à la main (aucun framework), polices auto-hébergées (Fraunces, Bricolage Grotesque, Young Serif, Hanken Grotesk). Tests Vitest sur un **vrai Postgres en mémoire**.
+- **Next.js 16** (App Router, Server Actions) et **TypeScript** strict.
+- **Postgres** avec **Drizzle ORM** : Neon en production, PGlite (Postgres embarqué) en local et dans les tests.
+- **Zod** pour la validation.
+- **CSS écrit à la main**, sans framework.
+- **Lenis** pour le défilement amorti de l'accueil.
+- **Polices auto-hébergées** : Anton (titres), Mrs Saint Delafield (signature), Hanken Grotesk (texte).
+- **Vitest** : les tests tournent sur un vrai Postgres en mémoire.
 
 ## Démarrer en local
 
+Il faut Node.js 22 ou plus récent.
+
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev
 ```
 
-Sans `DATABASE_URL`, une base embarquée est créée dans `.pglite/`, migrée et garnie d'un catalogue de démonstration. Pour tester le back-office, créez `.env.local` :
+Le site est alors disponible sur http://localhost:3000.
+
+Sans `DATABASE_URL`, une base embarquée est créée dans `.pglite/`, migrée, puis garnie du catalogue de démonstration.
+
+Pour accéder au back-office, créez un fichier `.env.local` contenant :
 
 ```
 ADMIN_EMAIL=vous@exemple.test
 ```
 
-puis inscrivez-vous avec cette adresse : le compte est administrateur.
+Inscrivez-vous ensuite sur le site avec cette adresse : ce compte devient administrateur.
 
-Autres commandes : `npm test`, `npm run lint`, `npm run typecheck`, `npm run db:generate` (après un changement de `src/db/schema.ts`).
+### Commandes utiles
 
-## Déployer sur Vercel (gratuit)
+| Commande | Effet |
+| --- | --- |
+| `npm run dev` | Serveur de développement |
+| `npm test` | Tests (Vitest) |
+| `npm run lint` | Lint (ESLint) |
+| `npm run typecheck` | Vérification des types |
+| `npm run build` | Build de production (vérifie d'abord les variables obligatoires) |
+| `npm run db:generate` | Génère une migration après un changement de `src/db/schema.ts` |
+| `npm run db:migrate` | Applique les migrations sur `DATABASE_URL` |
+| `npm run db:seed` | Charge le catalogue de démonstration dans une base vide |
 
-1. **Base de données** : créez un projet [Neon](https://neon.tech) (offre gratuite) ou ajoutez l'intégration Neon depuis le tableau de bord Vercel, qui renseigne `DATABASE_URL` toute seule.
-2. **Projet** : importez le dépôt dans Vercel. `vercel-build` applique les migrations puis construit le site.
-3. **Variables d'environnement** (Settings → Environment Variables, voir `.env.example`). Obligatoires en production, sans quoi le build échoue volontairement :
-   `DATABASE_URL`, `APP_SECRET` (32 caractères aléatoires), `ADMIN_EMAIL`, `SHOP_LEGAL_NAME`, `SHOP_CONTACT_EMAIL`.
-4. Ouvrez le site, inscrivez-vous avec `ADMIN_EMAIL`, puis remplacez le catalogue de démonstration depuis `/admin`.
+## Structure du projet
 
-Le catalogue de démonstration n'est chargé automatiquement qu'en local. Sur une base de production vide, posez `SEED_DEMO_CATALOG=true` pour le charger au premier déploiement, ou lancez `npm run db:seed` avec `DATABASE_URL`, ou créez directement vos rayons et produits dans `/admin`.
+```
+public/assets/         Photos des produits et logo servis par le site
+assets/                Photos d'origine
+src/app/               Pages (App Router) et Server Actions
+  page.tsx             Page d'accueil
+  globals.css          Styles de base
+  theme.css            Direction artistique commune à tout le site
+  home.css             Accueil : dôme, hero, maison, appel final
+  home-sheet.css       Accueil : savoir-faire, pièces phares, rayons
+src/components/        Composants partagés (en-tête, pied de page, vignettes…)
+  home/                Composants de l'accueil (dôme, onglets, rails, animations)
+src/config/            Identité de la boutique, mentions légales
+src/db/                Schéma Drizzle, connexion, catalogue de démonstration
+src/server/            Logique métier : catalogue, panier, commandes, admin
+src/payments/          Fournisseurs de paiement (demo, stripe)
+drizzle/               Migrations SQL
+tests/                 Tests Vitest
+```
 
-## Identité visuelle
+## Personnaliser la boutique
 
-`SHOP_THEME` choisit un preset : `papier` (papeterie, livres, artisanat), `atelier` (sombre, cuivre : outillage, mode, design) ou `marche` (verts et terre cuite : alimentation, plantes, bien-être). Chaque preset redéfinit la palette nommée et la police d'affichage dans `src/app/globals.css`. Les produits sans photo reçoivent une vignette typographique teintée (6 teintes) ; une adresse de photo peut être renseignée dans l'administration.
+- **Produits et rayons** : gérez-les depuis `/admin`. Pour chaque produit, renseignez l'adresse de sa photo, par exemple `/assets/product-1.jpeg`.
+- **Photos** : déposez-les dans `public/assets/`. Des photos sur fond blanc donnent le meilleur rendu : le site les fond dans des fonds sable ou rose, ce qui fait paraître les sacs détourés.
+- **Catalogue de démonstration** : il se trouve dans `src/db/seed.ts` (8 sacs en 3 rayons). Les prix et descriptions sont des exemples à remplacer.
+- **Textes de l'accueil** : ils sont dans `src/app/page.tsx` (exigences du savoir-faire, bandeau défilant, bannière de collection).
+- **Nom, slogan et description** : réglez-les avec `SHOP_NAME`, `SHOP_TAGLINE` et `SHOP_DESCRIPTION`.
+- **Couleurs** : elles sont définies sous forme de variables en tête de `src/app/theme.css` (site) et de `src/app/home-sheet.css` (partie claire de l'accueil).
 
-## Devise
+## Déployer sur Vercel
 
-`SHOP_CURRENCY` : devise de base (`XOF` par défaut, franc CFA sans décimale ; `EUR` ou `USD` possibles). Les prix du catalogue sont saisis dans cette devise. Les montants sont toujours des entiers en unité mineure (centimes, ou francs pour le XOF) : aucun flottant n'entre dans un calcul d'argent.
+1. **Base de données** : créez un projet [Neon](https://neon.tech) (offre gratuite), ou ajoutez l'intégration Neon depuis le tableau de bord Vercel. Elle renseigne `DATABASE_URL` toute seule.
+2. **Projet** : importez ce dépôt dans Vercel. Le script `vercel-build` applique les migrations, puis construit le site.
+3. **Variables** : renseignez-les dans *Settings → Environment Variables* (voir la section suivante). Sans les variables obligatoires, le build échoue volontairement.
+4. **Catalogue** : sur une base de production vide, posez `SEED_DEMO_CATALOG=true` pour charger le catalogue de démonstration au premier déploiement. Vous pouvez aussi lancer `npm run db:seed` avec `DATABASE_URL`, ou créer directement vos produits dans `/admin`.
+5. **Administration** : ouvrez le site et inscrivez-vous avec l'adresse `ADMIN_EMAIL`.
 
-**Multi-devises (XOF, USD, EUR)** : dans `/admin/devises`, saisissez un taux (« 1 XOF = combien de USD ? », ex. `0.0016`) et cochez « Proposer … aux visiteurs ». Un sélecteur apparaît alors dans l'en-tête ; le choix est mémorisé par cookie. Le client est facturé dans la devise choisie : les prix unitaires et les frais de port sont convertis à la création de la commande, et la devise est enregistrée sur la commande (paiement, e-mail et back-office l'affichent). Limites : les taux sont saisis à la main (pas de flux de change en direct), une devise sans taux reste inactive, et la conversion est arrondie par prix unitaire.
+## Variables d'environnement
 
-## Paiement : passer du mode test au réel
+Le fichier `.env.example` liste toutes les variables, avec un commentaire pour chacune.
 
-- **Mode test (par défaut)** : `PAYMENT_PROVIDERS=demo`. Aucun argent ne circule ; un bandeau l'indique aux visiteurs (`SHOP_DEMO_NOTICE`).
-- **Stripe** : `PAYMENT_PROVIDERS=stripe` (ou `demo,stripe`), `STRIPE_SECRET_KEY` (une clé `sk_test_` pour les essais), `STRIPE_WEBHOOK_SECRET`, et déclarez `https://votre-domaine/api/webhooks/stripe` dans Stripe (événement `checkout.session.completed`). Une clé `sk_live_` est refusée tant que `ALLOW_LIVE_PAYMENTS=true` n'est pas posé.
-- **Vente réelle** : `SHOP_DEMO_NOTICE=false` interdit le fournisseur `demo`. Vendre suppose un statut qui le permet, des conditions de vente et une fiscalité en règle : relisez les pages légales avec votre situation.
-- **FedaPay, KKiaPay, mobile money** : à ajouter en implémentant `PaymentProvider` (`src/payments/types.ts`) : `createPayment` renvoie l'adresse de paiement, `parseWebhook` vérifie la signature et traduit l'événement. Tout le reste (idempotence, contrôle du montant, stock, e-mail) est déjà en place. Ces deux adaptateurs ne sont pas livrés : leur documentation publique ne détaille pas la signature des webhooks, et un code de sécurité ne s'écrit pas de mémoire. Ils s'ajoutent avec une clé sandbox pour les vérifier.
-- **Paiement reçu hors ligne** (virement, espèces, mobile money manuel) : bouton « Enregistrer le paiement » sur la commande, dans l'administration.
+**Obligatoires en production :**
 
-## E-mails
+| Variable | Rôle |
+| --- | --- |
+| `DATABASE_URL` | Connexion Postgres (Neon) |
+| `APP_SECRET` | Secret aléatoire d'au moins 32 caractères |
+| `ADMIN_EMAIL` | Adresse du compte administrateur |
+| `SHOP_LEGAL_NAME` | Nom légal du vendeur (mentions légales) |
+| `SHOP_CONTACT_EMAIL` | E-mail de contact (pages légales et bouton « copier l'e-mail » de l'accueil) |
 
-Sans configuration, la confirmation de commande est écrite dans les journaux. Avec `RESEND_API_KEY` (et `MAIL_FROM` sur un domaine vérifié), elle est envoyée par [Resend](https://resend.com) (offre gratuite).
+**Principales variables facultatives :**
+
+| Variable | Rôle |
+| --- | --- |
+| `SHOP_CURRENCY` | `XOF` par défaut ; `EUR` ou `USD` possibles |
+| `SHOP_COUNTRIES` | Pays livrés, en codes ISO séparés par des virgules |
+| `SHOP_DEMO_NOTICE` | `false` pour passer en vente réelle |
+| `PAYMENT_PROVIDERS` | `demo`, `stripe`, ou les deux |
+| `RESEND_API_KEY`, `MAIL_FROM` | Envoi réel des e-mails de confirmation |
+| `SITE_URL` | URL publique (déduite automatiquement sur Vercel) |
+
+Pour générer `APP_SECRET` :
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+## Paiement
+
+- **Mode test (par défaut)** : `PAYMENT_PROVIDERS=demo`. Aucun argent ne circule, et une pastille l'indique aux visiteurs.
+- **Stripe** :
+  - posez `PAYMENT_PROVIDERS=stripe` (ou `demo,stripe`), `STRIPE_SECRET_KEY` et `STRIPE_WEBHOOK_SECRET` ;
+  - déclarez `https://votre-domaine/api/webhooks/stripe` dans Stripe, avec l'événement `checkout.session.completed` ;
+  - une clé `sk_live_` est refusée tant que `ALLOW_LIVE_PAYMENTS=true` n'est pas posé.
+- **Vente réelle** : `SHOP_DEMO_NOTICE=false` désactive le paiement de démonstration. Relisez les pages légales avec votre situation (statut, conditions de vente, fiscalité).
+- **Paiement reçu hors ligne** (virement, espèces, mobile money manuel) : utilisez le bouton « Enregistrer le paiement » sur la commande, dans l'administration.
+- **Autres fournisseurs** (FedaPay, KKiaPay, mobile money) : implémentez l'interface `PaymentProvider` de `src/payments/types.ts`. Elle a deux méthodes :
+  - `createPayment` renvoie l'adresse de paiement ;
+  - `parseWebhook` vérifie la signature et traduit l'événement.
+
+  Le reste est déjà en place : idempotence, contrôle du montant, stock, e-mail.
+
+Le montant et la devise encaissés doivent correspondre exactement à ceux de la commande. Un webhook rejoué n'a aucun effet.
+
+## Devises
+
+Les prix du catalogue sont saisis dans la devise de base (`SHOP_CURRENCY`). Les montants sont toujours des entiers en unité mineure : aucun nombre à virgule n'entre dans un calcul d'argent.
+
+Pour proposer d'autres devises (XOF, USD, EUR) :
+
+1. Dans `/admin/devises`, saisissez un taux, par exemple « 1 XOF = 0,0016 USD ».
+2. Cochez « Proposer aux visiteurs ».
+
+Un sélecteur apparaît alors dans l'en-tête. Le client est facturé dans la devise choisie, et cette devise est enregistrée sur la commande. Les taux se saisissent à la main : il n'y a pas de flux de change en direct.
 
 ## Sécurité
 
-- Actions du back-office revérifiées côté serveur (`requireAdmin`), pas seulement masquées.
-- Limitation de débit atomique en base (connexion, inscription, commande), par empreinte anonyme : ni adresse IP ni e-mail en clair.
-- Redirections de retour limitées aux chemins internes ; commandes consultables sans compte uniquement avec leur jeton secret.
-- En-têtes de sécurité, `robots` sans indexation des pages privées.
-- Un paiement reçu pour une commande qu'on ne peut plus honorer (expirée dont le stock a été vendu, annulée) est signalé « remboursement à faire » dans le back-office.
+- Les actions du back-office sont revérifiées côté serveur, pas seulement masquées dans l'interface.
+- Les sessions utilisent un jeton haché et les mots de passe sont hachés avec `scrypt`.
+- Une limitation de débit en base protège la connexion, l'inscription et la commande, sans stocker d'adresse IP ni d'e-mail en clair.
+- Les redirections de retour sont limitées aux chemins internes. Une commande n'est consultable sans compte qu'avec son jeton secret.
+- Le site envoie des en-têtes de sécurité, et les pages privées ne sont pas indexées.
+- Un paiement reçu pour une commande qu'on ne peut plus honorer est signalé « remboursement à faire » dans le back-office.
 
-Limites connues : sur Vercel, le nettoyage des commandes expirées se fait au fil des visites (pas de tâche planifiée sur l'offre gratuite) ; les tests tournent sur PGlite, mono-connexion, donc la garantie de non-survente en concurrence réelle repose sur la conditionnelle `UPDATE … WHERE stock >= n` de Postgres, non sur un test multi-connexions.
+## Limites connues
+
+- **Commandes expirées** : sur l'offre gratuite de Vercel, il n'y a pas de tâche planifiée. Leur nettoyage se fait donc au fil des visites.
+- **Tests de concurrence** : les tests tournent sur PGlite, qui n'accepte qu'une connexion. La garantie de non-survente en concurrence réelle repose sur la condition `UPDATE … WHERE stock >= n` de Postgres, pas sur un test multi-connexions.
+- **Sans configuration e-mail**, la confirmation de commande est écrite dans les journaux au lieu d'être envoyée.
 
 ## Licence
 
-MIT.
+[MIT](LICENSE)
