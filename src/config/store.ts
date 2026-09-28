@@ -34,8 +34,17 @@ export function exponentForCurrency(code: string): number {
   return CURRENCY_EXPONENTS[code.toUpperCase()] ?? 2;
 }
 
+/**
+ * Valeur d'une variable d'environnement, nettoyée. Une variable vide ou faite
+ * d'espaces compte comme absente : un hébergeur qui importe `.env.example`
+ * crée des variables vides, qui doivent retomber sur la valeur par défaut.
+ */
+function envValue(name: string): string | undefined {
+  return process.env[name]?.trim() || undefined;
+}
+
 function currencyFromEnv(): CurrencyConfig {
-  const code = (process.env.SHOP_CURRENCY ?? "XOF").toUpperCase();
+  const code = (envValue("SHOP_CURRENCY") ?? "XOF").toUpperCase();
   return { code, exponent: exponentForCurrency(code) };
 }
 
@@ -44,24 +53,33 @@ export function toMinorUnits(major: number, exponent: number): number {
   return Math.round(major * 10 ** exponent);
 }
 
+/** Durée en minutes ; une valeur absente, nulle ou invalide retombe sur la valeur par défaut. */
+function positiveMinutes(value: string | undefined, fallback: number): number {
+  const minutes = Number(value);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : fallback;
+}
+
 const currency = currencyFromEnv();
 
 export const store: StoreConfig = {
-  name: process.env.SHOP_NAME?.trim() || "Shopping & Accessories",
-  tagline: process.env.SHOP_TAGLINE?.trim() || "Des pièces choisies. Un style qui reste.",
+  name: envValue("SHOP_NAME") ?? "Shopping & Accessories",
+  tagline: envValue("SHOP_TAGLINE") ?? "Des pièces choisies. Un style qui reste.",
   description:
-    process.env.SHOP_DESCRIPTION?.trim() ||
+    envValue("SHOP_DESCRIPTION") ??
     "Une sélection d’accessoires et d’objets essentiels, présentés comme des pièces de collection.",
-  locale: process.env.SHOP_LOCALE ?? "fr-FR",
+  locale: envValue("SHOP_LOCALE") ?? "fr-FR",
   currency,
-  theme: (process.env.SHOP_THEME as ThemeId | undefined) ?? "papier",
+  theme: (envValue("SHOP_THEME") as ThemeId | undefined) ?? "papier",
   shipping: {
     flatCents: toMinorUnits(currency.exponent === 0 ? 2000 : 4.9, currency.exponent),
     freeOverCents: toMinorUnits(currency.exponent === 0 ? 30000 : 60, currency.exponent),
-    countries: (process.env.SHOP_COUNTRIES ?? "BJ,TG,CI,SN,FR").split(",").map((c) => c.trim()),
+    countries: (envValue("SHOP_COUNTRIES") ?? "BJ,TG,CI,SN,FR")
+      .split(",")
+      .map((c) => c.trim().toUpperCase())
+      .filter(Boolean),
   },
-  orderReservationMinutes: Number(process.env.ORDER_RESERVATION_MINUTES ?? 30),
-  demoNotice: process.env.SHOP_DEMO_NOTICE !== "false",
+  orderReservationMinutes: positiveMinutes(envValue("ORDER_RESERVATION_MINUTES"), 30),
+  demoNotice: envValue("SHOP_DEMO_NOTICE") !== "false",
 };
 
 export const COUNTRY_NAMES: Record<string, string> = {

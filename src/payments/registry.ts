@@ -27,7 +27,7 @@ export class ProviderConfigError extends Error {}
  * un repli silencieux.
  */
 export function enabledProviders(env: Env = process.env): PaymentProvider[] {
-  const ids = (env.PAYMENT_PROVIDERS ?? "demo")
+  const ids = (env.PAYMENT_PROVIDERS?.trim() || "demo")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
