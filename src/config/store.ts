@@ -43,8 +43,34 @@ function envValue(name: string): string | undefined {
   return process.env[name]?.trim() || undefined;
 }
 
+/** Vrai si le moteur Intl accepte ce code de devise (ISO 4217). */
+function isValidCurrency(code: string): boolean {
+  try {
+    new Intl.NumberFormat("en", { style: "currency", currency: code });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Locale reconnue par Intl, sinon le français. */
+function localeFromEnv(): string {
+  const value = envValue("SHOP_LOCALE");
+  if (!value) return "fr-FR";
+  try {
+    return Intl.getCanonicalLocales(value)[0] ?? "fr-FR";
+  } catch {
+    console.warn(`SHOP_LOCALE « ${value} » invalide : fr-FR utilisée.`);
+    return "fr-FR";
+  }
+}
+
 function currencyFromEnv(): CurrencyConfig {
-  const code = (envValue("SHOP_CURRENCY") ?? "XOF").toUpperCase();
+  let code = (envValue("SHOP_CURRENCY") ?? "XOF").toUpperCase();
+  if (!isValidCurrency(code)) {
+    console.warn(`SHOP_CURRENCY « ${code} » invalide : XOF utilisée.`);
+    code = "XOF";
+  }
   return { code, exponent: exponentForCurrency(code) };
 }
 
@@ -67,7 +93,7 @@ export const store: StoreConfig = {
   description:
     envValue("SHOP_DESCRIPTION") ??
     "Une sélection d’accessoires et d’objets essentiels, présentés comme des pièces de collection.",
-  locale: envValue("SHOP_LOCALE") ?? "fr-FR",
+  locale: localeFromEnv(),
   currency,
   theme: (envValue("SHOP_THEME") as ThemeId | undefined) ?? "papier",
   shipping: {
