@@ -1,0 +1,8 @@
+# Fins de ligne LF dans le dépôt, quel que soit le système de la machine.
+* text=auto eol=lf
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.woff2 binary
