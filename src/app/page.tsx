@@ -61,6 +61,14 @@ const CRAFT: CraftValue[] = [
   },
 ];
 
+/** Les quatre entrées de la boutique, mises en avant dans le hero et la section « Nos univers ». */
+const UNIVERSES = [
+  { label: "Sacs", href: "/boutique?famille=sacs", lead: "Cabas, sacs à main, sacs d'épaule.", script: "Pour chaque jour" },
+  { label: "Femme", href: "/boutique?univers=femme&famille=vetements", lead: "Robes, hauts, pantalons et vestes.", script: "Vêtements" },
+  { label: "Homme", href: "/boutique?univers=homme&famille=vetements", lead: "Chemises, pantalons et vestes.", script: "Vêtements" },
+  { label: "Accessoires", href: "/boutique?famille=accessoires", lead: "Colliers, bagues, bracelets et petits essentiels.", script: "& bijoux" },
+];
+
 const MARQUEE = ["Femme", "Homme", "Enfant", "Friperie", "Fins de série", "Bijoux", "Sacs", "Du XS au XXL", "Livraison soignée"];
 
 export default async function HomePage() {
@@ -72,6 +80,16 @@ export default async function HomePage() {
     listProducts(db, { sort: "recent", pageSize: 24 }),
     getDisplayCurrency(),
   ]);
+
+  // Nombre de pièces par univers : affiché seulement quand il y en a (aucun chiffre inventé).
+  const universeTotals = await Promise.all([
+    listProducts(db, { family: "sacs", pageSize: 1 }),
+    listProducts(db, { department: "femme", family: "vetements", pageSize: 1 }),
+    listProducts(db, { department: "homme", family: "vetements", pageSize: 1 }),
+    listProducts(db, { family: ["accessoires", "bijoux"], pageSize: 1 }),
+  ]);
+  // Photo sur fond blanc : elle se fond dans la carte (une photo sur fond gris y laisserait un cadre).
+  const bagCover = catalogImages[0];
 
   // Les pièces disponibles ouvrent la sélection ; les épuisées la ferment.
   const available = [...catalog.items].sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0));
@@ -109,17 +127,25 @@ export default async function HomePage() {
   return (
     <div className="home">
       <HomeMotion />
-      <DomeGallery images={catalogImages} />
+      <DomeGallery images={catalogImages} labels={["Femme", "Homme", "Sacs", "Accessoires", "Bijoux", "Friperie"]} />
 
       <section className="hero" id="intro" aria-labelledby="hero-title">
         <p className="hero-kicker">
-          Mode, friperie &amp; bijoux choisis <span aria-hidden="true">→</span> livrés chez vous
+          Sacs <span aria-hidden="true">·</span> Vêtements femme &amp; homme <span aria-hidden="true">·</span> Accessoires &amp; bijoux
         </p>
         <SplitLetters as="h1" id="hero-title" className="hero-title" text={store.name} />
         <div className="ornament hero-ornament" aria-hidden="true">
           <span />
         </div>
         <p className="hero-script">Boutique de Mode &amp; Accessoires</p>
+        {/* Ce que vend la boutique, lisible et cliquable dès l'arrivée. */}
+        <nav className="hero-universes" aria-label="Nos univers">
+          {UNIVERSES.map((universe) => (
+            <Link key={universe.href} href={universe.href}>
+              {universe.label}
+            </Link>
+          ))}
+        </nav>
         <div className="hero-foot">
           <span>Collection {year}</span>
           <a href="#savoir-faire" className="hero-cue">
@@ -138,6 +164,45 @@ export default async function HomePage() {
         </section>
 
         <div className="sheet">
+          <section className="sheet-section universes-section" id="univers" aria-labelledby="univers-title">
+            <header className="sheet-head sheet-head-row" data-reveal>
+              <div>
+                <p className="sheet-eyebrow">Ce que nous vendons</p>
+                <SplitLetters as="h2" id="univers-title" className="sheet-title" text="Nos univers" />
+              </div>
+              <Link href="/boutique" className="sheet-link">
+                Toute la boutique <span aria-hidden="true">→</span>
+              </Link>
+            </header>
+            <ul className="universes" data-reveal>
+              {UNIVERSES.map((universe, index) => {
+                const total = universeTotals[index].total;
+                return (
+                  <li key={universe.href} className="universe-card" data-kind={index}>
+                    <Link href={universe.href}>
+                      <span className="universe-media" aria-hidden="true">
+                        {index === 0 ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="cutout" src={bagCover} alt="" loading="lazy" width={405} height={540} />
+                        ) : (
+                          <span className="universe-monogram">{universe.label.charAt(0)}</span>
+                        )}
+                      </span>
+                      <span className="universe-text">
+                        <span className="universe-script">{universe.script}</span>
+                        <span className="universe-name">{universe.label}</span>
+                        <span className="universe-lead">{universe.lead}</span>
+                        <span className="universe-cta">
+                          {total > 0 ? `${total} pièce${total > 1 ? "s" : ""}` : "Découvrir"} <span aria-hidden="true">→</span>
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
           <section className="sheet-section craft-section" aria-labelledby="craft-title">
             <header className="sheet-head" data-reveal>
               <p className="sheet-eyebrow">Le savoir-faire</p>
@@ -269,8 +334,8 @@ export default async function HomePage() {
             <div className="about-copy" data-reveal>
               <p className="about-lead">{store.description}</p>
               <p>
-                Chaque sac est sélectionné pour sa tenue, la qualité de ses finitions et sa capacité à accompagner une
-                garde-robe sans jamais la dater. Peu de modèles, mais les bons.
+                Sacs, vêtements femme et homme, accessoires et bijoux : chaque pièce est choisie pour sa tenue, ses
+                finitions et sa capacité à accompagner une garde-robe sans la dater. Peu de modèles, mais les bons.
               </p>
               <p>
                 Paiement sécurisé, stock réservé dès la commande et suivi jusqu&apos;à la livraison : la boutique est pensée

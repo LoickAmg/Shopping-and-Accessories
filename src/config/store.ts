@@ -89,10 +89,10 @@ const currency = currencyFromEnv();
 
 export const store: StoreConfig = {
   name: envValue("SHOP_NAME") ?? "Shopping & Accessories",
-  tagline: envValue("SHOP_TAGLINE") ?? "Des pièces choisies. Un style qui reste.",
+  tagline: envValue("SHOP_TAGLINE") ?? "Sacs, vêtements femme & homme, accessoires",
   description:
     envValue("SHOP_DESCRIPTION") ??
-    "Une sélection d’accessoires et d’objets essentiels, présentés comme des pièces de collection.",
+    "Sacs, vêtements femme et homme, accessoires et bijoux : neuf, friperie et fins de série, choisis pièce par pièce.",
   locale: localeFromEnv(),
   currency,
   theme: (envValue("SHOP_THEME") as ThemeId | undefined) ?? "papier",

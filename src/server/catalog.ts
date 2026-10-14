@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 
 import type { Db } from "@/db/client";
 import { categories, productVariants, products } from "@/db/schema";
@@ -10,7 +10,8 @@ export type Sort = (typeof SORTS)[number];
 
 export interface ProductFilter {
   category?: string;
-  family?: CategoryFamily;
+  /** Une famille, ou plusieurs (« Accessoires » regroupe accessoires et bijoux). */
+  family?: CategoryFamily | CategoryFamily[];
   department?: Department;
   condition?: Condition;
   /** Taille disponible (au moins une pièce en stock dans cette taille). */
@@ -118,7 +119,10 @@ export async function listProducts(db: Db, filter: ProductFilter = {}): Promise<
 
   const conditions = [eq(products.active, true)];
   if (filter.category) conditions.push(eq(categories.slug, filter.category));
-  if (filter.family) conditions.push(eq(categories.family, filter.family));
+  if (filter.family) {
+    const families = Array.isArray(filter.family) ? filter.family : [filter.family];
+    if (families.length > 0) conditions.push(inArray(categories.family, families));
+  }
   if (filter.department) conditions.push(eq(products.department, filter.department));
   if (filter.condition) conditions.push(eq(products.condition, filter.condition));
   if (filter.inStockOnly) conditions.push(sql`${productStock} > 0`);

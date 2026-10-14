@@ -10,6 +10,7 @@ import "@fontsource/cormorant-garamond/500-italic.css";
 import "@fontsource/hanken-grotesk/400.css";
 import "@fontsource/hanken-grotesk/600.css";
 import "@fontsource/hanken-grotesk/700.css";
+import "@fontsource/mrs-saint-delafield/400.css";
 
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";

@@ -21,7 +21,12 @@ function wrap(value: number, span: number): number {
   return ((((value + span / 2) % span) + span) % span) - span / 2;
 }
 
-export function DomeGallery({ images }: { images: string[] }) {
+/**
+ * `labels` : mots affichés sur certaines vignettes (Femme, Homme, Sacs…). Ils
+ * disent ce que vend la boutique même tant que le catalogue n'a que des photos
+ * de sacs, sans jamais montrer la photo d'un article pour un autre.
+ */
+export function DomeGallery({ images, labels = [] }: { images: string[]; labels?: string[] }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -163,6 +168,8 @@ export function DomeGallery({ images }: { images: string[] }) {
           // Distance au centre : ordre d'apparition, du cœur vers les bords.
           const distance = Math.hypot(col - (COLS - 1) / 2, (row - (ROWS - 1) / 2) * 1.3);
           const src = images[(col * 3 + row * 5) % images.length];
+          // Une vignette sur quatre, en quinconce, porte un mot plutôt qu'une photo.
+          const label = labels.length > 0 && (col + 2 * row) % 4 === 1 ? labels[(col + row) % labels.length] : null;
           return (
             <div
               key={index}
@@ -172,10 +179,17 @@ export function DomeGallery({ images }: { images: string[] }) {
               }}
               style={{ "--d": distance.toFixed(2) } as React.CSSProperties}
             >
-              <div className="dome-tile-inner">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" draggable={false} decoding="async" width={405} height={540} />
-              </div>
+              {label ? (
+                <div className="dome-tile-inner dome-word">
+                  <span className="dome-word-script">Shopping</span>
+                  <span className="dome-word-label">{label}</span>
+                </div>
+              ) : (
+                <div className="dome-tile-inner">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" draggable={false} decoding="async" width={405} height={540} />
+                </div>
+              )}
             </div>
           );
         })}

@@ -137,20 +137,42 @@ html[data-past-hero] .dome { visibility: hidden; pointer-events: none; }
   text-transform: uppercase;
 }
 .hero-kicker span { color: var(--gold); }
+/* Titre manuscrit (Mrs Saint Delafield), comme la signature d'une maison de couture. */
 .hero-title {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2.2rem, 5.4vw, 7rem);
-  font-weight: 500;
-  line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-family: "Mrs Saint Delafield", "Brush Script MT", cursive;
+  font-size: clamp(3.6rem, 9.4vw, 11rem);
+  font-weight: 400;
+  line-height: 1.15;
+  text-transform: none;
+  letter-spacing: 0;
   white-space: nowrap;
-  text-shadow: 0 4px 40px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 4px 40px rgba(0, 0, 0, 0.55);
 }
+/* Les boucles d'une écriture manuscrite débordent : pas de masque, les lettres apparaissent en fondu. */
+.hero-title .split-mask { overflow: visible; padding: 0; margin: 0; }
+.hero-title .split-word + .split-word { margin-left: 0.28em; }
 /* Le « & » du titre prend l'or du logo. */
 .hero-title .split-word:nth-child(2) .split-letter { color: var(--gold); }
 .hero-ornament { width: min(16rem, 50vw); margin: 1.4rem auto 0.4rem; }
+/* Les quatre univers, en pastilles cliquables : on sait tout de suite ce qui est vendu. */
+.hero-universes { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.55rem; margin-top: 1.6rem; }
+.hero-universes a {
+  padding: 0.62rem 1.25rem;
+  border-radius: 999px;
+  background: rgba(11, 10, 10, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(200, 160, 88, 0.55);
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.35s var(--ease-out);
+}
+.hero-universes a:hover { background: var(--ivory); color: var(--black); box-shadow: none; transform: translateY(-2px); }
 .hero-script {
   position: relative;
   z-index: 1;
@@ -346,9 +368,10 @@ html[data-past-hero] .dome { visibility: hidden; pointer-events: none; }
    ========================================================================== */
 @media (prefers-reduced-motion: no-preference) {
   .hero-kicker { animation: rise 1s var(--ease-out) 0.15s both; }
-  .hero-title .split-letter { animation: letter-rise 1.25s var(--ease-out) calc(0.25s + var(--i) * 38ms) both; }
+  .hero-title .split-letter { animation: script-rise 1.1s var(--ease-out) calc(0.25s + var(--i) * 45ms) both; }
   .hero-ornament { animation: ornament-in 1.2s var(--ease-out) 0.95s both; }
   .hero-script { animation: write 1.8s var(--ease-in-out) 1.15s both; }
+  .hero-universes { animation: rise 1s var(--ease-out) 1.7s both; }
   .hero-foot { animation: fade 1.2s ease 1.6s both; }
 
   .outro-glow { animation: breathe 9s ease-in-out infinite alternate; }
@@ -392,7 +415,7 @@ html[data-past-hero] .dome { visibility: hidden; pointer-events: none; }
 /* ---------- adaptatif ---------- */
 @media (max-width: 48rem) {
   .hero { padding-bottom: 7.5rem; }
-  .hero-title { white-space: normal; font-size: clamp(1.9rem, 9.5vw, 3.4rem); line-height: 1.08; }
+  .hero-title { white-space: normal; font-size: clamp(3rem, 15vw, 5.4rem); line-height: 1.05; }
   .hero-script { font-size: clamp(1.25rem, 5.6vw, 1.8rem); margin-top: 0; }
   .hero-ornament { margin-top: 1rem; }
   .hero-foot { bottom: 5.4rem; justify-content: center; }
@@ -415,4 +438,32 @@ html[data-past-hero] .dome { visibility: hidden; pointer-events: none; }
 /* L'ornement du hero se déploie depuis son losange central. */
 @keyframes ornament-in {
   from { opacity: 0; transform: scaleX(0.2); }
+}
+
+/* Apparition du titre manuscrit : chaque lettre monte en fondu, sans masque qui couperait les boucles. */
+@keyframes script-rise {
+  from { opacity: 0; transform: translateY(0.35em); filter: blur(4px); }
+}
+
+/* Vignettes-mots du dôme : ce que vend la boutique, en lettres d'or sur noir. */
+.dome-word {
+  display: grid;
+  place-content: center;
+  gap: 0.2em;
+  background: radial-gradient(circle at 50% 40%, #1d1a1b 0%, #0b0a0a 75%);
+  box-shadow: inset 0 0 0 1px rgba(200, 160, 88, 0.55);
+  text-align: center;
+  font-size: calc(var(--dome-r) * 0.03);
+}
+.dome-word-script { font-family: "Mrs Saint Delafield", cursive; font-size: 1.6em; line-height: 1; color: var(--rose-light); }
+.dome-word-label {
+  font-family: var(--font-display);
+  font-size: 1.15em;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: var(--gold-sheen);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

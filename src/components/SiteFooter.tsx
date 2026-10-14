@@ -22,6 +22,18 @@ export function SiteFooter() {
           <h2>Boutique</h2>
           <ul>
             <li>
+              <Link href="/boutique?famille=sacs">Sacs</Link>
+            </li>
+            <li>
+              <Link href="/boutique?univers=femme&famille=vetements">Vêtements femme</Link>
+            </li>
+            <li>
+              <Link href="/boutique?univers=homme&famille=vetements">Vêtements homme</Link>
+            </li>
+            <li>
+              <Link href="/boutique?famille=accessoires">Accessoires &amp; bijoux</Link>
+            </li>
+            <li>
               <Link href="/boutique">Tous les produits</Link>
             </li>
             <li>

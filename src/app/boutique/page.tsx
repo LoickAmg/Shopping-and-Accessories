@@ -66,9 +66,11 @@ export default async function ShopPage({ searchParams }: PageProps<"/boutique">)
   // Une taille demandée est toujours appliquée, même épuisée : on affiche « aucun produit » plutôt que tout le catalogue.
   const size = sizeParam.trim() || undefined;
   const sizeOptions = size && !sizes.includes(size) ? [...sizes, size] : sizes;
+  // Pour un visiteur, les bijoux sont des accessoires : « Accessoires » les inclut.
+  const familyFilter = family === "accessoires" ? (["accessoires", "bijoux"] as CategoryFamily[]) : family;
   const result = await listProducts(db, {
     category: activeCategory?.slug,
-    family,
+    family: familyFilter,
     department,
     condition,
     size,

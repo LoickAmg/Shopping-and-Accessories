@@ -490,3 +490,64 @@ a.pcard-quick { position: absolute; left: 0.75rem; right: 0.75rem; bottom: 0.75r
   text-transform: uppercase;
 }
 .badge-condition { background: var(--sheet-ink, #1e1915); color: #f2eadf; }
+
+/* ---------- nos univers : ce que vend la boutique, dès le premier écran clair ---------- */
+.universes {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0;
+}
+.universe-card a { display: grid; gap: 1rem; height: 100%; color: var(--sheet-ink); text-decoration: none; }
+.universe-media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--sheet-sand);
+  box-shadow: inset 0 0 0 1px rgba(200, 160, 88, 0.3);
+  transition: transform 0.7s var(--ease-out), box-shadow 0.4s ease;
+}
+.universe-card[data-kind="1"] .universe-media { background: var(--sheet-rose); }
+.universe-card[data-kind="2"] .universe-media { background: var(--black); }
+.universe-card[data-kind="3"] .universe-media { background: var(--sheet-camel); }
+.universe-media img { width: 86%; height: 86%; transition: transform 1s var(--ease-out); }
+.universe-monogram {
+  font-family: var(--font-display);
+  font-size: clamp(5rem, 9vw, 9rem);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--rose);
+  transition: transform 1s var(--ease-out);
+}
+.universe-card[data-kind="2"] .universe-monogram { background: var(--gold-sheen); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.universe-card[data-kind="3"] .universe-monogram { color: var(--gold-ink); }
+.universe-card a:hover .universe-media { transform: translateY(-4px); box-shadow: inset 0 0 0 1px var(--gold), 0 24px 50px rgba(11, 10, 10, 0.1); }
+.universe-card a:hover :is(.universe-media img, .universe-monogram) { transform: scale(1.06); }
+.universe-text { display: grid; gap: 0.3rem; }
+.universe-script { font-family: var(--font-accent); font-size: 1.1rem; font-style: italic; color: var(--sheet-gold); }
+.universe-name { font-family: var(--font-display); font-size: clamp(1.4rem, 2vw, 1.9rem); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.1; }
+.universe-lead { color: var(--sheet-soft); font-size: 0.9rem; line-height: 1.5; }
+.universe-cta { margin-top: 0.35rem; color: var(--rose); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+.universe-cta span { display: inline-block; transition: transform 0.4s var(--ease-out); }
+.universe-card a:hover .universe-cta span { transform: translateX(5px); }
+
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .universes[data-reveal] .universe-card { opacity: 0; transform: translateY(40px); transition: opacity 0.9s ease, transform 1.1s var(--ease-out); }
+  .universes[data-reveal] .universe-card:nth-child(2) { transition-delay: 0.08s; }
+  .universes[data-reveal] .universe-card:nth-child(3) { transition-delay: 0.16s; }
+  .universes[data-reveal] .universe-card:nth-child(4) { transition-delay: 0.24s; }
+  .universes[data-reveal].is-in .universe-card { opacity: 1; transform: none; }
+}
+@media (max-width: 62rem) {
+  .universes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 34rem) {
+  .universes { gap: 1rem 0.75rem; }
+  .universe-lead { display: none; }
+}
