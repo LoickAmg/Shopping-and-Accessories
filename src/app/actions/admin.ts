@@ -6,6 +6,7 @@ import { z } from "zod";
 import { store } from "@/config/store";
 import { getDb } from "@/db/client";
 import { parseRateInput } from "@/lib/currency";
+import { isAllowedImageUrl } from "@/lib/image-url";
 import { parseMoneyInput } from "@/lib/money";
 import { MissingRateError, getCurrency, setCurrencyRate } from "@/server/currency";
 import {
@@ -58,7 +59,10 @@ const productSchema = z.object({
     .string()
     .trim()
     .max(500)
-    .refine((value) => value === "" || /^https:\/\//i.test(value), "L'adresse de l'image doit commencer par https://")
+    .refine(
+      (value) => value === "" || isAllowedImageUrl(value),
+      "L'image doit être un chemin du site (/assets/…) ou une adresse en https://",
+    )
     .transform((value) => value || null),
   sku: z.string().trim().max(60).transform((value) => value || null),
 });

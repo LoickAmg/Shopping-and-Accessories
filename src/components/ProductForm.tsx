@@ -140,7 +140,22 @@ export function ProductForm({ initial, categories, currencyCode, exponent }: Pro
 
       <div className="field">
         <label htmlFor="imageUrl">Adresse de la photo (facultatif)</label>
-        <input id="imageUrl" name="imageUrl" type="url" placeholder="https://…" defaultValue={text("imageUrl")} {...invalid("imageUrl")} />
+        {/* type="text" : un champ « url » refuserait les chemins du site comme /assets/sac.jpeg. */}
+        <input
+          id="imageUrl"
+          name="imageUrl"
+          type="text"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="/assets/sac.jpeg ou https://…"
+          defaultValue={text("imageUrl")}
+          {...invalid("imageUrl")}
+          aria-describedby={errors.imageUrl ? "imageUrl-error imageUrl-hint" : "imageUrl-hint"}
+        />
+        <p className="field-hint" id="imageUrl-hint">
+          Une photo du site (déposée dans <code>public/assets/</code>) ou une adresse en https://.
+        </p>
         {err("imageUrl")}
       </div>
 
