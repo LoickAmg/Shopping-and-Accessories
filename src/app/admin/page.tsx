@@ -4,8 +4,10 @@ import { getDb } from "@/db/client";
 import { money } from "@/lib/format";
 import { getDashboardStats } from "@/server/admin";
 import { sweepExpiredOrders } from "@/server/context";
+import { requireAdmin } from "@/server/guard";
 
 export default async function AdminDashboard() {
+  await requireAdmin();
   const db = await getDb();
   await sweepExpiredOrders();
   const stats = await getDashboardStats(db);

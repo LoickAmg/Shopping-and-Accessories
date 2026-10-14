@@ -4,10 +4,12 @@ import { deleteCategoryAction } from "@/app/actions/admin";
 import { CategoryForm } from "@/components/CategoryForm";
 import { getDb } from "@/db/client";
 import { countByCategory, listCategories } from "@/server/catalog";
+import { requireAdmin } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Rayons" };
 
 export default async function AdminCategoriesPage({ searchParams }: PageProps<"/admin/categories">) {
+  await requireAdmin();
   const query = await searchParams;
   const db = await getDb();
   const [categories, counts] = await Promise.all([listCategories(db), countByCategory(db)]);

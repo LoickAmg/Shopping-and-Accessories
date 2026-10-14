@@ -7,12 +7,14 @@ import { COUNTRY_NAMES, store } from "@/config/store";
 import { getDb } from "@/db/client";
 import { STATUS_LABELS, formatDate, orderMoney } from "@/lib/format";
 import { getOrder } from "@/server/orders";
+import { requireAdmin } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Commande" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function AdminOrderPage({ params }: PageProps<"/admin/commandes/[id]">) {
+  await requireAdmin();
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const order = await getOrder(await getDb(), id);

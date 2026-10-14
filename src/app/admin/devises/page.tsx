@@ -6,10 +6,12 @@ import { getDb } from "@/db/client";
 import { rateToInput } from "@/lib/currency";
 import { money } from "@/lib/format";
 import { listAllCurrencies } from "@/server/currency";
+import { requireAdmin } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Devises" };
 
 export default async function AdminCurrenciesPage({ searchParams }: PageProps<"/admin/devises">) {
+  await requireAdmin();
   const query = await searchParams;
   const currencies = await listAllCurrencies(await getDb());
   const base = currencies.find((currency) => currency.isBase);

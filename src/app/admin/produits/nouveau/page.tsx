@@ -4,10 +4,12 @@ import { ProductForm } from "@/components/ProductForm";
 import { store } from "@/config/store";
 import { getDb } from "@/db/client";
 import { listCategories } from "@/server/catalog";
+import { requireAdmin } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Nouveau produit" };
 
 export default async function NewProductPage() {
+  await requireAdmin();
   const categories = await listCategories(await getDb());
 
   return (

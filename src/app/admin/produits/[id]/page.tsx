@@ -7,10 +7,12 @@ import { getDb } from "@/db/client";
 import { minorToInput } from "@/lib/money";
 import { getProductForAdmin } from "@/server/admin";
 import { listCategories } from "@/server/catalog";
+import { requireAdmin } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Modifier le produit" };
 
 export default async function EditProductPage({ params }: PageProps<"/admin/produits/[id]">) {
+  await requireAdmin();
   const { id } = await params;
   const productId = Number(id);
   if (!Number.isInteger(productId) || productId <= 0) notFound();

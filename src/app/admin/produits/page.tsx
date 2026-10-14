@@ -5,10 +5,12 @@ import { toggleProductAction } from "@/app/actions/admin";
 import { getDb } from "@/db/client";
 import { money } from "@/lib/format";
 import { listProductsForAdmin } from "@/server/admin";
+import { requireAdmin } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Produits" };
 
 export default async function AdminProductsPage({ searchParams }: PageProps<"/admin/produits">) {
+  await requireAdmin();
   const query = await searchParams;
   const rows = await listProductsForAdmin(await getDb());
 
