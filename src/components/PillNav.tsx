@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /**
  * Entrées dans l'ordre des sections de l'accueil : en faisant défiler la page,
@@ -16,6 +16,37 @@ const ITEMS = [
   { href: "/a-propos", label: "Maison", section: "maison", match: (path: string) => path.startsWith("/a-propos") },
 ];
 
+/** Contenu du menu « Boutique » : univers, familles de rayons et sélections. */
+const SHOP_MENU: { title: string; links: { href: string; label: string }[] }[] = [
+  {
+    title: "Univers",
+    links: [
+      { href: "/boutique?univers=femme", label: "Femme" },
+      { href: "/boutique?univers=homme", label: "Homme" },
+      { href: "/boutique?univers=enfant", label: "Enfant" },
+    ],
+  },
+  {
+    title: "Rayons",
+    links: [
+      { href: "/boutique?famille=vetements", label: "Vêtements" },
+      { href: "/boutique?famille=sacs", label: "Sacs" },
+      { href: "/boutique?famille=bijoux", label: "Bijoux" },
+      { href: "/boutique?famille=accessoires", label: "Accessoires" },
+    ],
+  },
+  {
+    title: "Sélections",
+    links: [
+      { href: "/boutique?etat=seconde_main", label: "Friperie" },
+      { href: "/boutique?etat=fin_de_serie", label: "Fin de série" },
+      { href: "/boutique", label: "Tout le catalogue" },
+    ],
+  },
+];
+
+const SHOP_INDEX = ITEMS.findIndex((item) => item.href === "/boutique");
+
 /** Navigation en pilule : un fond blanc glisse sous l'entrée active ou survolée. */
 export function PillNav() {
   const pathname = usePathname();
@@ -23,6 +54,8 @@ export function PillNav() {
   const pillRef = useRef<HTMLSpanElement>(null);
   const [section, setSection] = useState("intro");
   const [hovered, setHovered] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeTimer = useRef<number | undefined>(undefined);
 
   const onHome = pathname === "/";
   const activeIndex = onHome ? ITEMS.findIndex((item) => item.section === section) : ITEMS.findIndex((item) => item.match(pathname));
@@ -59,6 +92,41 @@ export function PillNav() {
     };
   }, [onHome]);
 
+  // Le menu se ferme au changement de page, sur Échap et sur un clic en dehors.
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setMenuOpen(false);
+  }
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        navRef.current?.querySelector<HTMLButtonElement>(".pill-nav-toggle")?.focus();
+      }
+    };
+    const onPointer = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [menuOpen]);
+
+  const openOnHover = (event: React.PointerEvent) => {
+    if (event.pointerType !== "mouse") return;
+    window.clearTimeout(closeTimer.current);
+    setMenuOpen(true);
+  };
+  const closeSoon = () => {
+    window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => setMenuOpen(false), 180);
+  };
+
   const place = useCallback(() => {
     const nav = navRef.current;
     const pill = pillRef.current;
@@ -81,19 +149,68 @@ export function PillNav() {
   }, [place]);
 
   return (
-    <nav className="pill-nav" aria-label="Navigation principale" ref={navRef} onPointerLeave={() => setHovered(null)}>
+    <nav
+      className="pill-nav"
+      aria-label="Navigation principale"
+      ref={navRef}
+      onPointerLeave={(event) => {
+        setHovered(null);
+        if (event.pointerType === "mouse") closeSoon();
+      }}
+    >
       <span className="pill-nav-pill" ref={pillRef} aria-hidden="true" />
       {ITEMS.map((item, index) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          aria-current={index === activeIndex ? "page" : undefined}
-          data-on={index === target ? "true" : undefined}
-          onPointerEnter={(event) => event.pointerType === "mouse" && setHovered(index)}
-        >
-          {item.label}
-        </Link>
+        <Fragment key={item.href}>
+          <Link
+            href={item.href}
+            aria-current={index === activeIndex ? "page" : undefined}
+            data-on={index === target ? "true" : undefined}
+            onPointerEnter={(event) => {
+              if (event.pointerType === "mouse") setHovered(index);
+              if (index === SHOP_INDEX) openOnHover(event);
+              else if (event.pointerType === "mouse") closeSoon();
+            }}
+          >
+            {item.label}
+          </Link>
+          {/* Le chevron suit « Boutique » ; la pilule ne compte que les liens, il ne la décale pas. */}
+          {index === SHOP_INDEX && (
+            <button
+              type="button"
+              className="pill-nav-toggle"
+              aria-expanded={menuOpen}
+              aria-controls="shop-menu"
+              aria-label={menuOpen ? "Fermer le menu Boutique" : "Ouvrir le menu Boutique"}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <span aria-hidden="true">▾</span>
+            </button>
+          )}
+        </Fragment>
       ))}
+      <div
+        className="shop-menu"
+        id="shop-menu"
+        hidden={!menuOpen}
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse") window.clearTimeout(closeTimer.current);
+        }}
+      >
+        {SHOP_MENU.map((group) => (
+          <div className="shop-menu-group" key={group.title}>
+            <p className="shop-menu-title">{group.title}</p>
+            <ul>
+              {group.links.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} onClick={() => setMenuOpen(false)}>
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </nav>
   );
 }

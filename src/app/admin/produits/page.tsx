@@ -48,14 +48,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ product, categoryName }) => (
+            {rows.map(({ product, stock, categoryName }) => (
               <tr key={product.id}>
                 <td>
                   <Link href={`/admin/produits/${product.id}`}>{product.name}</Link>
                 </td>
                 <td>{categoryName ?? "—"}</td>
                 <td className="num">{money(product.priceCents)}</td>
-                <td className="num">{product.stock}</td>
+                <td className="num">{stock}</td>
                 <td>{product.active ? "En vente" : "Archivé"}</td>
                 <td>
                   <form action={toggleProductAction}>

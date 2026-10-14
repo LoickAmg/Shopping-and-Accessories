@@ -17,10 +17,29 @@ export default async function NewProductPage() {
       <h1>Nouveau produit</h1>
       <div className="form-narrow" style={{ maxWidth: "40rem" }}>
         <ProductForm
-          categories={categories.map((category) => ({ id: category.id, name: category.name }))}
+          categories={categories.map((category) => ({ id: category.id, name: category.name, family: category.family }))}
           currencyCode={store.currency.code}
           exponent={store.currency.exponent}
-          initial={{ name: "", slug: "", summary: "", description: "", categoryId: "", price: "", compareAt: "", stock: "0", active: true, tone: "t1", imageUrl: "", sku: "" }}
+          initial={{
+            name: "",
+            slug: "",
+            summary: "",
+            description: "",
+            categoryId: "",
+            price: "",
+            compareAt: "",
+            active: true,
+            department: "femme",
+            condition: "neuf",
+            wearGrade: "",
+            defects: "",
+            material: "",
+            tone: "t1",
+            imageUrl: "",
+            gallery: "",
+            sku: "",
+            variants: [{ size: "", color: "", stock: "1", sku: "" }],
+          }}
         />
       </div>
     </>

@@ -15,6 +15,27 @@
       "when": 1790097685987,
       "tag": "0001_sad_captain_universe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792017376830,
+      "tag": "0002_catalogue_mode_ajouts",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792017392417,
+      "tag": "0003_catalogue_mode_retraits",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792018541319,
+      "tag": "0004_rayons_mode",
+      "breakpoints": true
     }
   ]
 }

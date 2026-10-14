@@ -1,10 +1,12 @@
 import { count } from "drizzle-orm";
 
 import { store, toMinorUnits } from "@/config/store";
-import { buildSearchText, slugify } from "@/lib/slug";
+import { slugify } from "@/lib/slug";
+import { searchTextOf } from "@/server/admin";
 
 import type { Db } from "./client";
-import { categories, products } from "./schema";
+import { categories, productVariants, products } from "./schema";
+import type { CategoryFamily } from "./schema";
 
 interface SeedProduct {
   name: string;
@@ -21,6 +23,7 @@ interface SeedProduct {
 interface SeedCategory {
   name: string;
   description: string;
+  family: CategoryFamily;
   products: SeedProduct[];
 }
 
@@ -33,6 +36,7 @@ const CATALOG: SeedCategory[] = [
   {
     name: "Sacs à main",
     description: "Portés à la main ou au creux du bras : des lignes nettes pour le bureau comme pour le soir.",
+    family: "sacs",
     products: [
       {
         name: "Sac Trapèze Croco, bleu nuit",
@@ -69,6 +73,7 @@ const CATALOG: SeedCategory[] = [
   {
     name: "Cabas",
     description: "Des volumes généreux qui gardent leur tenue, pour tout emporter sans rien sacrifier à l'allure.",
+    family: "sacs",
     products: [
       {
         name: "Cabas Médaillon, cuir noir",
@@ -105,6 +110,7 @@ const CATALOG: SeedCategory[] = [
   {
     name: "Sacs d'épaule",
     description: "Chaînes dorées et cuirs embossés : les sacs qu'on garde sur soi du matin au soir.",
+    family: "sacs",
     products: [
       {
         name: "Baguette Chaîne Croco, noir",
@@ -130,6 +136,21 @@ const CATALOG: SeedCategory[] = [
   },
 ];
 
+/**
+ * Rayons prêts à accueillir les vêtements et les bijoux. Ils restent vides tant
+ * qu'aucune pièce n'y est ajoutée depuis l'administration (aucun produit n'est
+ * inventé sans vraie photo) ; l'accueil n'affiche que les rayons garnis.
+ */
+const EMPTY_SHELVES: { name: string; description: string; family: CategoryFamily }[] = [
+  { name: "Hauts & chemises", description: "T-shirts, chemises, blouses et pulls.", family: "vetements" },
+  { name: "Robes & jupes", description: "Robes, jupes et ensembles.", family: "vetements" },
+  { name: "Pantalons & shorts", description: "Pantalons, jeans et shorts.", family: "vetements" },
+  { name: "Vestes & manteaux", description: "Vestes, blousons et manteaux.", family: "vetements" },
+  { name: "Colliers", description: "Colliers et pendentifs.", family: "bijoux" },
+  { name: "Bagues", description: "Bagues, à chaque taille de doigt.", family: "bijoux" },
+  { name: "Bracelets", description: "Bracelets et joncs.", family: "bijoux" },
+];
+
 /** Prix « barré » de démonstration sur quelques articles, pour montrer l'affichage d'une remise. */
 const COMPARE_AT: Record<string, number> = {
   "Sac Trapèze Croco, bleu nuit": 1.2,
@@ -143,7 +164,7 @@ export async function seedCatalog(db: Db): Promise<void> {
   for (const [position, category] of CATALOG.entries()) {
     const [inserted] = await db
       .insert(categories)
-      .values({ slug: slugify(category.name), name: category.name, description: category.description, position })
+      .values({ slug: slugify(category.name), name: category.name, description: category.description, family: category.family, position })
       .onConflictDoNothing()
       .returning();
     if (!inserted) continue;
@@ -152,23 +173,31 @@ export async function seedCatalog(db: Db): Promise<void> {
       const major = xof ? product.price.xof : product.price.eur;
       const priceCents = toMinorUnits(major, exponent);
       const factor = COMPARE_AT[product.name];
-      await db
+      const fields = { name: product.name, summary: product.summary, description: product.description, material: "Cuir", department: "femme" as const, condition: "neuf" as const };
+      const [row] = await db
         .insert(products)
         .values({
+          ...fields,
           slug: slugify(product.name),
-          name: product.name,
-          summary: product.summary,
-          description: product.description,
-          searchText: buildSearchText(product.name, product.summary, product.description, category.name),
+          searchText: searchTextOf(fields, category.name),
           categoryId: inserted.id,
           priceCents,
           compareAtCents: factor ? Math.round((priceCents * factor) / 10 ** exponent) * 10 ** exponent : null,
-          stock: product.stock,
           tone: product.tone,
           imageUrl: product.image,
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: products.id });
+      // Un sac n'a pas de taille : une seule déclinaison, qui porte le stock.
+      if (row) await db.insert(productVariants).values({ productId: row.id, stock: product.stock });
     }
+  }
+
+  for (const [offset, shelf] of EMPTY_SHELVES.entries()) {
+    await db
+      .insert(categories)
+      .values({ ...shelf, slug: slugify(shelf.name), position: CATALOG.length + offset })
+      .onConflictDoNothing();
   }
 }
 

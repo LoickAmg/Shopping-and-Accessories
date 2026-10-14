@@ -1,17 +1,21 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { Db } from "@/db/client";
-import { cartItems, carts, products } from "@/db/schema";
-import type { Product } from "@/db/schema";
+import { cartItems, carts, productVariants, products } from "@/db/schema";
+import type { Product, ProductVariant } from "@/db/schema";
+import { variantLabel } from "@/lib/taxonomy";
 
-/** Quantité maximale d'un même article dans un panier. */
+/** Quantité maximale d'un même article (même déclinaison) dans un panier. */
 export const MAX_PER_LINE = 10;
 
 export interface CartLine {
   product: Product;
+  variant: ProductVariant;
+  /** « Taille M · Noir », vide pour un article sans déclinaison. */
+  variantLabel: string;
   quantity: number;
   lineTotalCents: number;
-  /** Stock actuel : peut être inférieur à la quantité demandée si le catalogue a changé depuis. */
+  /** Stock actuel de la déclinaison : peut être inférieur à la quantité demandée si le catalogue a changé depuis. */
   available: number;
   /** Vrai si l'article n'est plus achetable en l'état (retiré, épuisé, quantité supérieure au stock). */
   problem: "unavailable" | "insufficient" | null;
@@ -39,26 +43,34 @@ function clampQuantity(quantity: number, stock: number): number {
   return Math.max(0, Math.min(Math.floor(quantity), MAX_PER_LINE, stock));
 }
 
+/** Une déclinaison est achetable si elle et son produit sont actifs. Renvoie son stock achetable (0 sinon). */
+function purchasableStock(product: Pick<Product, "active">, variant: Pick<ProductVariant, "active" | "stock">): number {
+  return product.active && variant.active ? variant.stock : 0;
+}
+
 export async function getCartView(db: Db, cartId: string | undefined | null): Promise<CartView> {
   if (!cartId) return EMPTY;
 
   const rows = await db
-    .select({ product: products, quantity: cartItems.quantity })
+    .select({ product: products, variant: productVariants, quantity: cartItems.quantity })
     .from(cartItems)
-    .innerJoin(products, eq(cartItems.productId, products.id))
+    .innerJoin(productVariants, eq(cartItems.variantId, productVariants.id))
+    .innerJoin(products, eq(productVariants.productId, products.id))
     .where(eq(cartItems.cartId, cartId))
-    .orderBy(asc(products.name));
+    .orderBy(asc(products.name), asc(productVariants.position), asc(productVariants.id));
 
   if (rows.length === 0) return { ...EMPTY, cartId };
 
-  const lines: CartLine[] = rows.map(({ product, quantity }) => {
-    const purchasable = product.active && product.stock > 0;
-    const problem = !purchasable ? "unavailable" : quantity > product.stock ? "insufficient" : null;
+  const lines: CartLine[] = rows.map(({ product, variant, quantity }) => {
+    const available = purchasableStock(product, variant);
+    const problem = available <= 0 ? "unavailable" : quantity > available ? "insufficient" : null;
     return {
       product,
+      variant,
+      variantLabel: variantLabel(variant),
       quantity,
       lineTotalCents: product.priceCents * quantity,
-      available: product.active ? product.stock : 0,
+      available,
       problem,
     };
   });
@@ -91,57 +103,72 @@ async function ensureCart(db: Db, cartId: string | undefined | null, userId: str
   return created.id;
 }
 
+async function loadVariant(db: Db, variantId: number): Promise<{ product: Product; variant: ProductVariant } | undefined> {
+  const [row] = await db
+    .select({ product: products, variant: productVariants })
+    .from(productVariants)
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(eq(productVariants.id, variantId))
+    .limit(1);
+  return row;
+}
+
 /**
- * Ajoute `quantity` exemplaires d'un produit et renvoie l'identifiant du panier
- * (créé au besoin). La quantité totale est plafonnée par le stock et par
- * `MAX_PER_LINE` ; un produit retiré ou épuisé ne peut pas être ajouté.
+ * Ajoute `quantity` exemplaires d'une déclinaison et renvoie l'identifiant du
+ * panier (créé au besoin). La quantité totale est plafonnée par le stock de la
+ * déclinaison et par `MAX_PER_LINE` ; un article retiré ou épuisé ne peut pas
+ * être ajouté. `productId`, s'il est fourni, doit correspondre à la déclinaison :
+ * le formulaire ne peut pas glisser la taille d'un autre produit.
  */
 export async function addToCart(
   db: Db,
-  input: { cartId?: string | null; userId?: string | null; productId: number; quantity: number },
+  input: { cartId?: string | null; userId?: string | null; variantId: number; productId?: number; quantity: number },
 ): Promise<{ cartId: string; quantity: number }> {
-  const [product] = await db.select().from(products).where(eq(products.id, input.productId)).limit(1);
-  if (!product || !product.active) throw new UnavailableProductError();
-  if (product.stock <= 0) throw new UnavailableProductError("Cet article est en rupture de stock.");
+  const found = await loadVariant(db, input.variantId);
+  if (!found || (input.productId != null && found.product.id !== input.productId)) throw new UnavailableProductError();
+  const stock = purchasableStock(found.product, found.variant);
+  if (!found.product.active || !found.variant.active) throw new UnavailableProductError();
+  if (stock <= 0) throw new UnavailableProductError("Cet article est en rupture de stock.");
 
   const cartId = await ensureCart(db, input.cartId, input.userId ?? null);
 
   const [current] = await db
     .select({ quantity: cartItems.quantity })
     .from(cartItems)
-    .where(and(eq(cartItems.cartId, cartId), eq(cartItems.productId, product.id)))
+    .where(and(eq(cartItems.cartId, cartId), eq(cartItems.variantId, found.variant.id)))
     .limit(1);
 
-  const target = clampQuantity((current?.quantity ?? 0) + Math.max(1, Math.floor(input.quantity)), product.stock);
+  const target = clampQuantity((current?.quantity ?? 0) + Math.max(1, Math.floor(input.quantity)), stock);
 
   await db
     .insert(cartItems)
-    .values({ cartId, productId: product.id, quantity: target })
-    .onConflictDoUpdate({ target: [cartItems.cartId, cartItems.productId], set: { quantity: target } });
+    .values({ cartId, variantId: found.variant.id, quantity: target })
+    .onConflictDoUpdate({ target: [cartItems.cartId, cartItems.variantId], set: { quantity: target } });
   await touchCart(db, cartId);
   return { cartId, quantity: target };
 }
 
 /** Fixe la quantité d'une ligne ; 0 (ou moins) la supprime. */
-export async function setQuantity(db: Db, cartId: string, productId: number, quantity: number): Promise<void> {
+export async function setQuantity(db: Db, cartId: string, variantId: number, quantity: number): Promise<void> {
   if (quantity <= 0) {
-    await removeFromCart(db, cartId, productId);
+    await removeFromCart(db, cartId, variantId);
     return;
   }
-  const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-  if (!product || !product.active || product.stock <= 0) {
-    await removeFromCart(db, cartId, productId);
+  const found = await loadVariant(db, variantId);
+  const stock = found ? purchasableStock(found.product, found.variant) : 0;
+  if (stock <= 0) {
+    await removeFromCart(db, cartId, variantId);
     return;
   }
   await db
     .update(cartItems)
-    .set({ quantity: clampQuantity(quantity, product.stock) })
-    .where(and(eq(cartItems.cartId, cartId), eq(cartItems.productId, productId)));
+    .set({ quantity: clampQuantity(quantity, stock) })
+    .where(and(eq(cartItems.cartId, cartId), eq(cartItems.variantId, variantId)));
   await touchCart(db, cartId);
 }
 
-export async function removeFromCart(db: Db, cartId: string, productId: number): Promise<void> {
-  await db.delete(cartItems).where(and(eq(cartItems.cartId, cartId), eq(cartItems.productId, productId)));
+export async function removeFromCart(db: Db, cartId: string, variantId: number): Promise<void> {
+  await db.delete(cartItems).where(and(eq(cartItems.cartId, cartId), eq(cartItems.variantId, variantId)));
   await touchCart(db, cartId);
 }
 
@@ -167,24 +194,28 @@ export async function mergeGuestCart(db: Db, guestCartId: string | undefined | n
   }
 
   const guestItems = await db.select().from(cartItems).where(eq(cartItems.cartId, guest.id));
-  const productRows = guestItems.length
-    ? await db.select().from(products).where(inArray(products.id, guestItems.map((item) => item.productId)))
+  const variantRows = guestItems.length
+    ? await db
+        .select({ product: products, variant: productVariants })
+        .from(productVariants)
+        .innerJoin(products, eq(productVariants.productId, products.id))
+        .where(inArray(productVariants.id, guestItems.map((item) => item.variantId)))
     : [];
-  const stockById = new Map(productRows.map((product) => [product.id, product.stock]));
+  const stockById = new Map(variantRows.map((row) => [row.variant.id, purchasableStock(row.product, row.variant)]));
 
   for (const item of guestItems) {
-    const stock = stockById.get(item.productId) ?? 0;
+    const stock = stockById.get(item.variantId) ?? 0;
     if (stock <= 0) continue;
     const [existing] = await db
       .select({ quantity: cartItems.quantity })
       .from(cartItems)
-      .where(and(eq(cartItems.cartId, userCartId), eq(cartItems.productId, item.productId)))
+      .where(and(eq(cartItems.cartId, userCartId), eq(cartItems.variantId, item.variantId)))
       .limit(1);
     const merged = clampQuantity((existing?.quantity ?? 0) + item.quantity, stock);
     await db
       .insert(cartItems)
-      .values({ cartId: userCartId, productId: item.productId, quantity: merged })
-      .onConflictDoUpdate({ target: [cartItems.cartId, cartItems.productId], set: { quantity: merged } });
+      .values({ cartId: userCartId, variantId: item.variantId, quantity: merged })
+      .onConflictDoUpdate({ target: [cartItems.cartId, cartItems.variantId], set: { quantity: merged } });
   }
 
   await db.delete(carts).where(eq(carts.id, guest.id));

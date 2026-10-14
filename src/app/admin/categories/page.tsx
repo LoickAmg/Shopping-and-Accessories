@@ -32,7 +32,7 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
                 <p className="muted small" style={{ margin: 0 }}>
                   {counts.get(category.id) ?? 0} produit(s) en vente
                 </p>
-                <CategoryForm initial={{ id: category.id, name: category.name, description: category.description, position: category.position }} />
+                <CategoryForm initial={{ id: category.id, name: category.name, description: category.description, family: category.family, position: category.position }} />
                 <form action={deleteCategoryAction}>
                   <input type="hidden" name="id" value={category.id} />
                   <button type="submit" className="link-button">
@@ -47,7 +47,7 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
 
         <aside className="summary" aria-labelledby="add-category">
           <h2 id="add-category">Nouveau rayon</h2>
-          <CategoryForm initial={{ name: "", description: "", position: categories.length }} />
+          <CategoryForm initial={{ name: "", description: "", family: "vetements", position: categories.length }} />
         </aside>
       </div>
     </>

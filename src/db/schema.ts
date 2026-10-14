@@ -21,15 +21,37 @@ import {
  * n'entre jamais dans un calcul d'argent.
  */
 
+/** Familles de rayons : elles organisent le menu « Boutique » (vêtements, sacs, bijoux, accessoires). */
+export const CATEGORY_FAMILIES = ["vetements", "sacs", "bijoux", "accessoires"] as const;
+export type CategoryFamily = (typeof CATEGORY_FAMILIES)[number];
+
+/** Univers d'un produit : à qui il s'adresse. */
+export const DEPARTMENTS = ["femme", "homme", "enfant", "mixte"] as const;
+export type Department = (typeof DEPARTMENTS)[number];
+
+/** Neuf, seconde main (friperie) ou fin de série (déstockage). */
+export const CONDITIONS = ["neuf", "seconde_main", "fin_de_serie"] as const;
+export type Condition = (typeof CONDITIONS)[number];
+
+/** Niveau d'usure d'une pièce de seconde main. */
+export const WEAR_GRADES = ["comme_neuf", "tres_bon", "bon"] as const;
+export type WearGrade = (typeof WEAR_GRADES)[number];
+
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
+  family: text("family", { enum: CATEGORY_FAMILIES }).notNull().default("sacs"),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Fiche produit : ce qui est commun à toutes ses déclinaisons (nom, prix,
+ * photos, état). Le stock n'est pas ici mais sur chaque déclinaison
+ * (`product_variants`) : un t-shirt en S, M et L est une seule fiche.
+ */
 export const products = pgTable(
   "products",
   {
@@ -41,22 +63,58 @@ export const products = pgTable(
     categoryId: integer("category_id").references(() => categories.id, { onDelete: "set null" }),
     priceCents: integer("price_cents").notNull(),
     compareAtCents: integer("compare_at_cents"),
-    stock: integer("stock").notNull().default(0),
     active: boolean("active").notNull().default(true),
-    /** Teinte de la vignette typographique (t1 à t6), tant qu'aucune photo n'est fournie. */
+    department: text("department", { enum: DEPARTMENTS }).notNull().default("femme"),
+    condition: text("condition", { enum: CONDITIONS }).notNull().default("neuf"),
+    /** Seconde main seulement : état d'usure, et défauts signalés honnêtement à l'acheteur. */
+    wearGrade: text("wear_grade", { enum: WEAR_GRADES }),
+    defects: text("defects").notNull().default(""),
+    /** Matière principale (cuir, coton, acier inoxydable, plaqué or…). */
+    material: text("material").notNull().default(""),
+    /** Teinte de la vignette (t1 à t6) : fond de carte, ou vignette typographique sans photo. */
     tone: text("tone").notNull().default("t1"),
     imageUrl: text("image_url"),
+    /** Photos supplémentaires (dos, détails, défauts), dans l'ordre d'affichage. */
+    gallery: text("gallery").array().notNull().default(sql`'{}'::text[]`),
     sku: text("sku"),
-    /** Nom, résumé et description sans accents ni majuscules : la recherche compare avec cette colonne. */
+    /** Nom, résumé, description, matière et univers sans accents ni majuscules : la recherche compare avec cette colonne. */
     searchText: text("search_text").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    check("products_stock_non_negative", sql`${table.stock} >= 0`),
     check("products_price_positive", sql`${table.priceCents} >= 0`),
     index("products_category_idx").on(table.categoryId),
     index("products_active_idx").on(table.active),
+    index("products_department_idx").on(table.department),
+    index("products_condition_idx").on(table.condition),
+  ],
+);
+
+/**
+ * Déclinaison achetable d'un produit : une taille et/ou une couleur, avec son
+ * propre stock. Un produit sans taille (sac, collier) a une seule déclinaison,
+ * aux champs vides. Le panier, la réservation de stock et les commandes
+ * travaillent à ce niveau.
+ */
+export const productVariants = pgTable(
+  "product_variants",
+  {
+    id: serial("id").primaryKey(),
+    productId: integer("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    size: text("size").notNull().default(""),
+    color: text("color").notNull().default(""),
+    sku: text("sku"),
+    stock: integer("stock").notNull().default(0),
+    position: integer("position").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+  },
+  (table) => [
+    check("product_variants_stock_non_negative", sql`${table.stock} >= 0`),
+    index("product_variants_product_idx").on(table.productId),
+    uniqueIndex("product_variants_unique").on(table.productId, table.size, table.color),
   ],
 );
 
@@ -100,13 +158,13 @@ export const cartItems = pgTable(
     cartId: uuid("cart_id")
       .notNull()
       .references(() => carts.id, { onDelete: "cascade" }),
-    productId: integer("product_id")
+    variantId: integer("variant_id")
       .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
+      .references(() => productVariants.id, { onDelete: "cascade" }),
     quantity: integer("quantity").notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.cartId, table.productId] }),
+    primaryKey({ columns: [table.cartId, table.variantId] }),
     check("cart_items_quantity_positive", sql`${table.quantity} > 0`),
   ],
 );
@@ -153,8 +211,11 @@ export const orderItems = pgTable(
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
     productId: integer("product_id").references(() => products.id, { onDelete: "set null" }),
-    /** Copie du nom et du prix au moment de l'achat : une commande ne change pas quand le catalogue change. */
+    variantId: integer("variant_id").references(() => productVariants.id, { onDelete: "set null" }),
+    /** Copie du nom, de la déclinaison et du prix au moment de l'achat : une commande ne change pas quand le catalogue change. */
     name: text("name").notNull(),
+    /** « Taille M · Noir », vide pour un article sans déclinaison. */
+    variantLabel: text("variant_label").notNull().default(""),
     unitPriceCents: integer("unit_price_cents").notNull(),
     quantity: integer("quantity").notNull(),
   },
@@ -217,6 +278,7 @@ export interface ShippingAddress {
 export type Category = typeof categories.$inferSelect;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
+export type ProductVariant = typeof productVariants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;

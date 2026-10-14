@@ -451,3 +451,15 @@ a.pcard-quick { position: absolute; left: 0.75rem; right: 0.75rem; bottom: 0.75r
   .spotlight-media { order: -1; width: min(80vw, 22rem); margin: 0 auto; }
   .sheet-section { padding-left: 1rem; padding-right: 1rem; }
 }
+
+/* ---------- produits sans photo et badges d'état ---------- */
+/* Sans photo, la carte affiche l'initiale du produit : jamais la photo d'un autre article. */
+.pcard-letter,
+.shelf-card-letter {
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 9vw, 7rem);
+  line-height: 1;
+  color: rgba(30, 25, 21, 0.28);
+  text-transform: uppercase;
+}
+.badge-condition { background: var(--sheet-ink, #1e1915); color: #f2eadf; }

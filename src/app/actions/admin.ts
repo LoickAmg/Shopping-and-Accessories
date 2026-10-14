@@ -5,12 +5,15 @@ import { z } from "zod";
 
 import { store } from "@/config/store";
 import { getDb } from "@/db/client";
+import { CATEGORY_FAMILIES, CONDITIONS, DEPARTMENTS, WEAR_GRADES } from "@/db/schema";
 import { parseRateInput } from "@/lib/currency";
 import { isAllowedImageUrl } from "@/lib/image-url";
 import { parseMoneyInput } from "@/lib/money";
+import { parseVariantRows } from "@/lib/variant-form";
 import { MissingRateError, getCurrency, setCurrencyRate } from "@/server/currency";
 import {
   createCategory,
+  InvalidVariantsError,
   createProduct,
   deleteCategory,
   setProductActive,
@@ -44,6 +47,15 @@ const requiredPrice = (label: string) => z.string().transform((raw, ctx) => pars
 const optionalPrice = (label: string) =>
   z.string().transform((raw, ctx): number | null | typeof z.NEVER => (raw.trim() === "" ? null : parsePrice(label, raw, ctx)));
 
+/** Adresse d'image facultative : chemin du site ou https. */
+const imageField = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((value) => value === "" || isAllowedImageUrl(value), "L'image doit être un chemin du site (/assets/…) ou une adresse en https://");
+
+const MAX_GALLERY = 8;
+
 const productSchema = z.object({
   name: z.string().trim().min(2, "Le nom est obligatoire.").max(160),
   slug: z.string().trim().max(160).optional(),
@@ -52,18 +64,26 @@ const productSchema = z.object({
   categoryId: z.string().transform((value) => (value === "" ? null : Number(value))),
   priceCents: requiredPrice("Le prix"),
   compareAtCents: optionalPrice("Le prix barré"),
-  stock: z.coerce.number().int("Le stock doit être un entier.").min(0, "Le stock ne peut pas être négatif.").max(1_000_000),
   active: z.string().optional().transform((value) => value === "on"),
-  tone: z.enum(TONES),
-  imageUrl: z
+  department: z.enum(DEPARTMENTS, { error: "Choisissez un univers." }),
+  condition: z.enum(CONDITIONS, { error: "Choisissez un état." }),
+  wearGrade: z
     .string()
-    .trim()
-    .max(500)
-    .refine(
-      (value) => value === "" || isAllowedImageUrl(value),
-      "L'image doit être un chemin du site (/assets/…) ou une adresse en https://",
-    )
-    .transform((value) => value || null),
+    .optional()
+    .transform((value) => (value ? value : null))
+    .refine((value) => value == null || (WEAR_GRADES as readonly string[]).includes(value), "État d'usure inconnu.")
+    .transform((value) => value as (typeof WEAR_GRADES)[number] | null),
+  defects: z.string().trim().max(600).optional().default(""),
+  material: z.string().trim().max(80).optional().default(""),
+  tone: z.enum(TONES),
+  imageUrl: imageField.transform((value) => value || null),
+  gallery: z
+    .string()
+    .optional()
+    .default("")
+    .transform((value) => value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean))
+    .refine((urls) => urls.length <= MAX_GALLERY, `${MAX_GALLERY} photos supplémentaires au maximum.`)
+    .refine((urls) => urls.every((url) => url.length <= 500 && isAllowedImageUrl(url)), "Chaque photo doit être un chemin du site (/assets/…) ou une adresse en https://, une par ligne."),
   sku: z.string().trim().max(60).transform((value) => value || null),
 });
 
@@ -83,17 +103,29 @@ export async function saveProductAction(_previous: AdminFormState, formData: For
   if (data.compareAtCents != null && data.compareAtCents <= data.priceCents) {
     return { errors: { compareAtCents: "Le prix barré doit être supérieur au prix." }, values };
   }
-  const input: ProductInput = { ...data, slug: data.slug || undefined };
+  if (data.condition === "seconde_main" && !data.wearGrade) {
+    return { errors: { wearGrade: "Indiquez l'état d'usure de la pièce." }, values };
+  }
+  const { variants, error: variantError } = parseVariantRows(raw);
+  if (variantError) return { errors: { variants: variantError }, values };
+  const input: ProductInput = { ...data, slug: data.slug || undefined, variants };
 
   const db = await getDb();
   const id = Number(raw.id);
-  if (Number.isInteger(id) && id > 0) {
-    const updated = await updateProduct(db, id, input);
-    if (!updated) return { message: "Produit introuvable.", values };
-    redirect(`/admin/produits?enregistre=${updated.id}`);
+  let savedId: number;
+  try {
+    if (Number.isInteger(id) && id > 0) {
+      const updated = await updateProduct(db, id, input);
+      if (!updated) return { message: "Produit introuvable.", values };
+      savedId = updated.id;
+    } else {
+      savedId = (await createProduct(db, input)).id;
+    }
+  } catch (error) {
+    if (error instanceof InvalidVariantsError) return { errors: { variants: error.message }, values };
+    throw error;
   }
-  const created = await createProduct(db, input);
-  redirect(`/admin/produits?enregistre=${created.id}`);
+  redirect(`/admin/produits?enregistre=${savedId}`);
 }
 
 export async function toggleProductAction(formData: FormData): Promise<void> {
@@ -106,6 +138,7 @@ export async function toggleProductAction(formData: FormData): Promise<void> {
 const categorySchema = z.object({
   name: z.string().trim().min(2, "Le nom est obligatoire.").max(80),
   description: z.string().trim().max(300),
+  family: z.enum(CATEGORY_FAMILIES, { error: "Choisissez une famille." }),
   position: z.coerce.number().int().min(0).max(1000).default(0),
 });
 

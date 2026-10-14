@@ -7,7 +7,15 @@ import type { AdminFormState } from "@/app/actions/admin";
 
 const INITIAL: AdminFormState = {};
 
-export function CategoryForm({ initial }: { initial: { id?: number; name: string; description: string; position: number } }) {
+/** Familles du menu « Boutique » : chaque rayon se range dans l'une d'elles. */
+const FAMILIES = [
+  { id: "vetements", label: "Vêtements" },
+  { id: "sacs", label: "Sacs" },
+  { id: "bijoux", label: "Bijoux" },
+  { id: "accessoires", label: "Accessoires" },
+];
+
+export function CategoryForm({ initial }: { initial: { id?: number; name: string; description: string; family: string; position: number } }) {
   const [state, action, pending] = useActionState(saveCategoryAction, INITIAL);
   const errors = state.errors ?? {};
   const prefix = initial.id ?? "new";
@@ -20,6 +28,17 @@ export function CategoryForm({ initial }: { initial: { id?: number; name: string
           <label htmlFor={`name-${prefix}`}>Nom</label>
           <input id={`name-${prefix}`} name="name" defaultValue={initial.name} required aria-invalid={Boolean(errors.name)} />
           {errors.name && <p className="field-error">{errors.name}</p>}
+        </div>
+        <div className="field">
+          <label htmlFor={`family-${prefix}`}>Famille</label>
+          <select id={`family-${prefix}`} name="family" defaultValue={initial.family} aria-invalid={Boolean(errors.family)}>
+            {FAMILIES.map((family) => (
+              <option key={family.id} value={family.id}>
+                {family.label}
+              </option>
+            ))}
+          </select>
+          {errors.family && <p className="field-error">{errors.family}</p>}
         </div>
         <div className="field">
           <label htmlFor={`position-${prefix}`}>Ordre</label>

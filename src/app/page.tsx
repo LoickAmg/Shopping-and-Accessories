@@ -7,7 +7,7 @@ import { ProductCard } from "@/components/home/ProductCard";
 import { Rail } from "@/components/home/Rail";
 import { CopyEmail, RollLink } from "@/components/home/RollLink";
 import { ScrollText, SplitLetters } from "@/components/home/SplitText";
-import { catalogImages, fallbackImage } from "@/components/ProductTile";
+import { catalogImages } from "@/components/ProductTile";
 import { getSeller } from "@/config/legal";
 import { store } from "@/config/store";
 import { getDb } from "@/db/client";
@@ -82,7 +82,6 @@ export default async function HomePage() {
     getDisplayCurrency(),
   ]);
 
-  const imageOf = (product: { id: number; imageUrl: string | null }) => product.imageUrl || fallbackImage(product.id);
   // Les pièces disponibles ouvrent la sélection ; les épuisées la ferment.
   const available = [...catalog.items].sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0));
   const pieces = available.slice(0, 10).map((product, index) => {
@@ -95,21 +94,23 @@ export default async function HomePage() {
       price: moneyIn(product.priceCents, currency),
       wasPrice: discounted ? moneyIn(product.compareAtCents as number, currency) : null,
       discountPercent: discounted ? Math.round((1 - product.priceCents / (product.compareAtCents as number)) * 100) : null,
-      image: imageOf(product),
+      image: product.imageUrl,
+      tone: product.tone,
       soldOut: product.stock <= 0,
       isNew: index < 2,
+      // Ajout direct au panier seulement pour un article sans choix de taille.
+      quickVariantId: product.singleVariantId,
+      condition: product.condition,
     };
   });
-  // Chaque rayon est illustré par sa pièce la plus récente.
-  const shelves = categories.map((category, index) => {
-    const cover = catalog.items.find((product) => product.categoryId === category.id);
-    return {
-      ...category,
-      count: counts.get(category.id) ?? 0,
-      image: cover ? imageOf(cover) : catalogImages[index % catalogImages.length],
-    };
-  });
-  const spotlight = catalog.items.find((product) => product.stock > 0 && product.imageUrl) ?? catalog.items[0];
+  // Seuls les rayons garnis apparaissent, illustrés par la photo de leur pièce la plus récente.
+  const shelves = categories
+    .filter((category) => (counts.get(category.id) ?? 0) > 0)
+    .map((category) => {
+      const cover = catalog.items.find((product) => product.categoryId === category.id && product.imageUrl);
+      return { ...category, count: counts.get(category.id) ?? 0, image: cover?.imageUrl ?? null };
+    });
+  const spotlight = catalog.items.find((product) => product.stock > 0 && product.imageUrl);
   const seller = getSeller();
   const contactEmail = seller.email.includes("@") ? seller.email : null;
   const year = new Date().getFullYear();
@@ -208,7 +209,7 @@ export default async function HomePage() {
                 <div className="spotlight-media" aria-hidden="true">
                   <span className="spotlight-disc" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="cutout" src={imageOf(spotlight)} alt="" loading="lazy" width={810} height={1080} />
+                  <img className="cutout" src={spotlight.imageUrl ?? ""} alt="" loading="lazy" width={810} height={1080} />
                 </div>
               </Link>
             </section>
@@ -230,8 +231,14 @@ export default async function HomePage() {
                   <li className="shelf-card" key={shelf.id} data-tint={index % 3}>
                     <Link href={`/boutique?categorie=${shelf.slug}`} draggable={false}>
                       <span className="shelf-card-media">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="cutout" src={shelf.image} alt="" loading="lazy" draggable={false} width={405} height={540} />
+                        {shelf.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="cutout" src={shelf.image} alt="" loading="lazy" draggable={false} width={405} height={540} />
+                        ) : (
+                          <span className="shelf-card-letter" aria-hidden="true">
+                            {shelf.name.charAt(0)}
+                          </span>
+                        )}
                         <span className="shelf-card-count">
                           {shelf.count} pièce{shelf.count > 1 ? "s" : ""}
                         </span>

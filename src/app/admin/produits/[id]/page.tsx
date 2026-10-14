@@ -27,7 +27,7 @@ export default async function EditProductPage({ params }: PageProps<"/admin/prod
       <h1>{product.name}</h1>
       <div className="form-narrow" style={{ maxWidth: "40rem" }}>
         <ProductForm
-          categories={categories.map((category) => ({ id: category.id, name: category.name }))}
+          categories={categories.map((category) => ({ id: category.id, name: category.name, family: category.family }))}
           currencyCode={store.currency.code}
           exponent={exponent}
           initial={{
@@ -39,11 +39,23 @@ export default async function EditProductPage({ params }: PageProps<"/admin/prod
             categoryId: product.categoryId == null ? "" : String(product.categoryId),
             price: minorToInput(product.priceCents, exponent),
             compareAt: product.compareAtCents == null ? "" : minorToInput(product.compareAtCents, exponent),
-            stock: String(product.stock),
             active: product.active,
+            department: product.department,
+            condition: product.condition,
+            wearGrade: product.wearGrade ?? "",
+            defects: product.defects,
+            material: product.material,
             tone: product.tone,
             imageUrl: product.imageUrl ?? "",
+            gallery: product.gallery.join("\n"),
             sku: product.sku ?? "",
+            variants: product.variants.map((variant) => ({
+              id: variant.id,
+              size: variant.size,
+              color: variant.color,
+              stock: String(variant.stock),
+              sku: variant.sku ?? "",
+            })),
           }}
         />
       </div>

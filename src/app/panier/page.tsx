@@ -42,19 +42,26 @@ export default async function CartPage() {
       <div className="two-col">
         <ul className="lines" aria-label="Articles du panier">
           {cart.lines.map((line) => (
-            <li key={line.product.id} className="line">
-              <TileArt name={line.product.name} tone={line.product.tone} imageUrl={line.product.imageUrl} productId={line.product.id} />
+            <li key={line.variant.id} className="line">
+              <TileArt name={line.product.name} tone={line.product.tone} imageUrl={line.product.imageUrl} />
               <div className="line-body">
                 <h3>
                   <Link href={`/produit/${line.product.slug}`}>{line.product.name}</Link>
                 </h3>
+                {line.variantLabel && (
+                  <p className="line-variant" style={{ gridColumn: "1 / -1" }}>
+                    {line.variantLabel}
+                  </p>
+                )}
                 <p className="price" style={{ margin: 0 }}>
                   {money(line.lineTotalCents)}
                 </p>
                 <p className="muted small" style={{ margin: 0, gridColumn: "1 / -1" }}>
                   {money(line.product.priceCents)} l&apos;unité
                 </p>
-                {line.problem === "unavailable" && <p className="line-problem">Cet article n&apos;est plus disponible.</p>}
+                {line.problem === "unavailable" && (
+                  <p className="line-problem">{line.variantLabel ? "Cette taille n'est plus disponible." : "Cet article n'est plus disponible."}</p>
+                )}
                 {line.problem === "insufficient" && (
                   <p className="line-problem">
                     Seulement {line.available} en stock : réduisez la quantité.
@@ -62,17 +69,18 @@ export default async function CartPage() {
                 )}
                 <div className="line-actions">
                   <form action={updateQuantityAction} className="actions">
-                    <input type="hidden" name="productId" value={line.product.id} />
-                    <label htmlFor={`qty-${line.product.id}`} className="sr-only">
+                    <input type="hidden" name="variantId" value={line.variant.id} />
+                    <label htmlFor={`qty-${line.variant.id}`} className="sr-only">
                       Quantité de {line.product.name}
+                      {line.variantLabel && `, ${line.variantLabel}`}
                     </label>
-                    <input id={`qty-${line.product.id}`} type="number" name="quantity" min={0} max={MAX_PER_LINE} defaultValue={line.quantity} />
+                    <input id={`qty-${line.variant.id}`} type="number" name="quantity" min={0} max={MAX_PER_LINE} defaultValue={line.quantity} />
                     <button type="submit" className="button button-quiet button-small">
                       Mettre à jour
                     </button>
                   </form>
                   <form action={removeFromCartAction}>
-                    <input type="hidden" name="productId" value={line.product.id} />
+                    <input type="hidden" name="variantId" value={line.variant.id} />
                     <button type="submit" className="link-button">
                       Retirer
                     </button>

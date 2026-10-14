@@ -12,7 +12,7 @@ import type { PayableOrder } from "@/payments/types";
 import { addToCart } from "@/server/cart";
 import { createOrder } from "@/server/orders";
 
-import { createTestDb, resetDb } from "./helpers";
+import { createTestDb, resetDb, variantOf } from "./helpers";
 
 const SECRET = "whsec_test_secret";
 const NOW = 1_800_000_000;
@@ -212,7 +212,7 @@ describe("application d'un avis de paiement", () => {
   beforeEach(async () => {
     await resetDb(db, { seeded: true });
     const [product] = await db.select().from(products).where(eq(products.slug, "cabas-double-soufflet-noir"));
-    const { cartId } = await addToCart(db, { productId: product.id, quantity: 2 });
+    const { cartId } = await addToCart(db, { variantId: (await variantOf(db, product.slug)).id, quantity: 2 });
     const order = await createOrder(db, {
       cartId,
       userId: null,

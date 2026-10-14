@@ -76,7 +76,10 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/co
               <tbody>
                 {order.items.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.name}</td>
+                    <td>
+                      {item.name}
+                      {item.variantLabel && <span className="muted"> — {item.variantLabel}</span>}
+                    </td>
                     <td className="num">{item.quantity}</td>
                     <td className="num">{money(item.unitPriceCents * item.quantity)}</td>
                   </tr>

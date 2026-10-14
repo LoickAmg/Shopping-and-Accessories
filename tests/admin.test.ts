@@ -19,7 +19,7 @@ import { addToCart } from "@/server/cart";
 import { getProductBySlug, listProducts } from "@/server/catalog";
 import { cancelOrder, createOrder, markOrderPaid } from "@/server/orders";
 
-import { createTestDb, resetDb } from "./helpers";
+import { createTestDb, resetDb, variantOf } from "./helpers";
 
 let db: Db;
 
@@ -38,11 +38,17 @@ const NEW_PRODUCT: ProductInput = {
   categoryId: null,
   priceCents: 12500,
   compareAtCents: null,
-  stock: 6,
   active: true,
+  department: "mixte",
+  condition: "neuf",
+  wearGrade: null,
+  defects: "",
+  material: "Laiton",
   tone: "t3",
   imageUrl: null,
+  gallery: [],
   sku: null,
+  variants: [{ size: "", color: "", sku: null, stock: 6 }],
 };
 
 describe("produits", () => {
@@ -77,21 +83,21 @@ describe("produits", () => {
   });
 
   it("refuse un stock négatif et un prix négatif au niveau de la base", async () => {
-    await expect(createProduct(db, { ...NEW_PRODUCT, stock: -1 })).rejects.toThrow();
+    await expect(createProduct(db, { ...NEW_PRODUCT, variants: [{ size: "", color: "", sku: null, stock: -1 }] })).rejects.toThrow();
     await expect(createProduct(db, { ...NEW_PRODUCT, priceCents: -5 })).rejects.toThrow();
   });
 });
 
 describe("rayons", () => {
   it("crée un rayon avec un identifiant unique", async () => {
-    await createCategory(db, { name: "Cabas", description: "", position: 9 });
+    await createCategory(db, { name: "Cabas", description: "", family: "sacs", position: 9 });
     const slugs = (await db.select().from(categories)).map((category) => category.slug);
     expect(slugs).toContain("cabas-2");
   });
 
   it("renommer un rayon met à jour la recherche de ses produits", async () => {
     const [cabas] = await db.select().from(categories).where(eq(categories.slug, "cabas"));
-    await updateCategory(db, cabas.id, { name: "Intérieur", description: "", position: 0 });
+    await updateCategory(db, cabas.id, { name: "Intérieur", description: "", family: "sacs", position: 0 });
     expect((await listProducts(db, { q: "interieur", category: "cabas" })).total).toBe(3);
   });
 
@@ -116,7 +122,7 @@ describe("tableau de bord", () => {
   it("totalise le chiffre d'affaires des commandes payées seulement et signale les remboursements", async () => {
     const [soap] = await db.select().from(products).where(eq(products.slug, "cabas-double-soufflet-noir"));
     const place = async () => {
-      const { cartId } = await addToCart(db, { productId: soap.id, quantity: 1 });
+      const { cartId } = await addToCart(db, { variantId: (await variantOf(db, soap.slug)).id, quantity: 1 });
       return createOrder(db, {
         cartId,
         userId: null,

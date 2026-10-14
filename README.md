@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/LoickAmg/Shopping-and-Accessories/actions/workflows/ci.yml/badge.svg)](https://github.com/LoickAmg/Shopping-and-Accessories/actions/workflows/ci.yml)
 
-Boutique en ligne de sacs et d'accessoires de mode : vitrine immersive, catalogue, panier, comptes clients, commande avec réservation de stock, paiement et back-office. Le site se déploie gratuitement sur Vercel avec une base Postgres Neon.
+Boutique de mode en ligne : vêtements femme, homme et enfant (neuf, friperie, fin de série), sacs et bijoux. Vitrine immersive, catalogue, panier, comptes clients, commande avec réservation de stock, paiement et back-office. Le site se déploie gratuitement sur Vercel avec une base Postgres Neon.
 
 - [Aperçu](#aperçu)
 - [Fonctionnalités](#fonctionnalités)
@@ -37,7 +37,10 @@ Les animations respectent le réglage « réduire les animations » du système.
 
 ## Fonctionnalités
 
-- **Catalogue** : rayons, recherche insensible aux accents, tri, filtre « en stock », pagination, prix barrés, fiches produit avec données structurées.
+- **Catalogue** : univers (Femme, Homme, Enfant, Mixte), rayons regroupés en familles (Vêtements, Sacs, Bijoux, Accessoires), recherche insensible aux accents (nom, matière, couleur), tri, pagination, prix barrés, fiches produit avec données structurées.
+- **Tailles et couleurs** : une fiche par article, avec ses déclinaisons (taille, couleur) et un stock par déclinaison. Le client choisit sa taille ; les tailles épuisées restent visibles mais ne peuvent pas être choisies.
+- **Neuf, friperie, fin de série** : chaque article a un état. Une pièce de seconde main indique son état d'usure (comme neuf, très bon, bon) et ses défauts éventuels ; une fin de série porte un badge et se retrouve dans la sélection « Fin de série ».
+- **Filtres** : univers, rayon, état, taille disponible et « en stock seulement », combinables. Le menu « Boutique » de l'en-tête y mène directement.
 - **Panier** : fonctionne sans compte (cookie) et fusionne avec celui du compte à la connexion. Les quantités sont plafonnées par le stock et les articles devenus indisponibles sont signalés.
 - **Commande** : validation côté serveur, adresse, choix du paiement, acceptation des conditions de vente.
 - **Stock** : il est réservé dans une transaction (`UPDATE … WHERE stock >= quantité`), donc deux acheteurs ne peuvent pas se partager la dernière pièce. Une commande impayée expire après 30 minutes (réglable) et rend son stock.
@@ -117,9 +120,11 @@ tests/                 Tests Vitest
 
 ## Personnaliser la boutique
 
-- **Produits et rayons** : gérez-les depuis `/admin`. Pour chaque produit, renseignez l'adresse de sa photo, par exemple `/assets/product-1.jpeg`.
+- **Produits et rayons** : gérez-les depuis `/admin`. Chaque rayon appartient à une famille (Vêtements, Sacs, Bijoux, Accessoires), qui le range dans le menu « Boutique ».
+- **Tailles** : dans la fiche produit, la section « Tailles, couleurs et stock » propose des grilles toutes faites (adultes XS–XXL, enfant 2–14 ans, bagues 50–60). Pour un sac, un collier ou une pièce unique de friperie, gardez une seule ligne sans taille. Une taille retirée est désactivée, jamais supprimée : les commandes passées restent intactes.
+- **Photos** : une photo principale et jusqu'à 8 photos supplémentaires (dos, détails, défauts), sous la forme `/assets/robe.jpeg` ou d'une adresse en https://. Un produit sans photo affiche son initiale, jamais la photo d'un autre article.
 - **Photos** : déposez-les dans `public/assets/`. Des photos sur fond blanc donnent le meilleur rendu : le site les fond dans des fonds sable ou rose, ce qui fait paraître les sacs détourés.
-- **Catalogue de démonstration** : il se trouve dans `src/db/seed.ts` (8 sacs en 3 rayons). Les prix et descriptions sont des exemples à remplacer.
+- **Catalogue de démonstration** : il se trouve dans `src/db/seed.ts` (8 sacs en 3 rayons, plus 7 rayons vides prêts pour les vêtements et les bijoux). Les prix et descriptions sont des exemples à remplacer.
 - **Textes de l'accueil** : ils sont dans `src/app/page.tsx` (exigences du savoir-faire, bandeau défilant, bannière de collection).
 - **Nom, slogan et description** : réglez-les avec `SHOP_NAME`, `SHOP_TAGLINE` et `SHOP_DESCRIPTION`.
 - **Couleurs** : elles sont définies sous forme de variables en tête de `src/app/theme.css` (site) et de `src/app/home-sheet.css` (partie claire de l'accueil).

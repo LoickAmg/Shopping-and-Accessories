@@ -61,12 +61,13 @@ export default async function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {stats.lowStock.map((product) => (
-                <tr key={product.id}>
+              {stats.lowStock.map((line) => (
+                <tr key={`${line.productId}-${line.label}`}>
                   <td>
-                    <Link href={`/admin/produits/${product.id}`}>{product.name}</Link>
+                    <Link href={`/admin/produits/${line.productId}`}>{line.name}</Link>
+                    {line.label && <span className="muted"> — {line.label}</span>}
                   </td>
-                  <td className="num">{product.stock}</td>
+                  <td className="num">{line.stock}</td>
                 </tr>
               ))}
             </tbody>

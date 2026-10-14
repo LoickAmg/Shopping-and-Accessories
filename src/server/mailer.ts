@@ -46,7 +46,7 @@ export function getMailer(env: NodeJS.ProcessEnv = process.env): Mailer {
 
 export function orderConfirmationEmail(order: OrderWithItems): Email {
   const money = (minor: number) => orderMoney(minor, order.currency);
-  const lines = order.items.map((item) => `- ${item.quantity} × ${item.name} : ${money(item.unitPriceCents * item.quantity)}`).join("\n");
+  const lines = order.items.map((item) => `- ${item.quantity} × ${item.name}${item.variantLabel ? ` (${item.variantLabel})` : ""} : ${money(item.unitPriceCents * item.quantity)}`).join("\n");
   const address = order.shippingAddress;
   const link = `${siteUrl()}/commande/${order.id}?token=${order.accessToken}`;
 

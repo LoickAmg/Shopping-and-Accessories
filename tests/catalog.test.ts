@@ -14,7 +14,20 @@ beforeAll(async () => {
 describe("catalogue", () => {
   it("liste les catégories dans l'ordre voulu", async () => {
     const categories = await listCategories(db);
-    expect(categories.map((category) => category.slug)).toEqual(["sacs-a-main", "cabas", "sacs-d-epaule"]);
+    expect(categories.map((category) => category.slug)).toEqual([
+      "sacs-a-main",
+      "cabas",
+      "sacs-d-epaule",
+      "hauts-chemises",
+      "robes-jupes",
+      "pantalons-shorts",
+      "vestes-manteaux",
+      "colliers",
+      "bagues",
+      "bracelets",
+    ]);
+    expect(categories.filter((category) => category.family === "vetements")).toHaveLength(4);
+    expect(categories.filter((category) => category.family === "bijoux")).toHaveLength(3);
   });
 
   it("pagine les produits actifs", async () => {

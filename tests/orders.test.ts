@@ -23,7 +23,7 @@ import { computeTotals } from "@/server/pricing";
 import type { ShippingRules } from "@/server/pricing";
 import { registerUser } from "@/server/auth";
 
-import { createTestDb, resetDb } from "./helpers";
+import { createTestDb, resetDb, setStock, stockOf as stockOfIn, variantOf } from "./helpers";
 
 const ADDRESS: ShippingAddress = { line1: "12 rue du Marché", postalCode: "75011", city: "Paris", country: "FR" };
 const SHIPPING: ShippingRules = { flatCents: 500, freeOverCents: 10000 };
@@ -38,18 +38,13 @@ beforeEach(async () => {
   await resetDb(db, { seeded: true });
 });
 
-async function productBySlug(slug: string) {
-  const [row] = await db.select().from(products).where(eq(products.slug, slug)).limit(1);
-  return row;
-}
-
 async function stockOf(slug: string): Promise<number> {
-  return (await productBySlug(slug)).stock;
+  return stockOfIn(db, slug);
 }
 
 async function cartWith(slug: string, quantity: number, cartId?: string) {
-  const product = await productBySlug(slug);
-  return addToCart(db, { cartId, productId: product.id, quantity });
+  const variant = await variantOf(db, slug);
+  return addToCart(db, { cartId, variantId: variant.id, quantity });
 }
 
 function checkout(cartId: string, overrides: Partial<Parameters<typeof createOrder>[1]> = {}) {
@@ -99,31 +94,31 @@ describe("panier", () => {
 
   it("refuse un produit épuisé ou inconnu", async () => {
     await expect(cartWith("seau-croco-a-fermoir-dore", 1)).rejects.toBeInstanceOf(UnavailableProductError);
-    await expect(addToCart(db, { productId: 99999, quantity: 1 })).rejects.toBeInstanceOf(UnavailableProductError);
+    await expect(addToCart(db, { variantId: 99999, quantity: 1 })).rejects.toBeInstanceOf(UnavailableProductError);
   });
 
   it("modifie et supprime des lignes", async () => {
     const { cartId } = await cartWith("cabas-double-soufflet-noir", 1);
-    const product = await productBySlug("cabas-double-soufflet-noir");
+    const variant = await variantOf(db, "cabas-double-soufflet-noir");
 
-    await setQuantity(db, cartId, product.id, 4);
+    await setQuantity(db, cartId, variant.id, 4);
     expect((await getCartView(db, cartId)).itemCount).toBe(4);
-    await setQuantity(db, cartId, product.id, 0);
+    await setQuantity(db, cartId, variant.id, 0);
     expect((await getCartView(db, cartId)).lines).toHaveLength(0);
 
     await cartWith("cabas-double-soufflet-noir", 1, cartId);
-    await removeFromCart(db, cartId, product.id);
+    await removeFromCart(db, cartId, variant.id);
     expect((await getCartView(db, cartId)).itemCount).toBe(0);
   });
 
   it("signale un article devenu indisponible ou en quantité excessive", async () => {
     const { cartId } = await cartWith("sac-cartable-clou-noir", 3);
-    await db.update(products).set({ stock: 1 }).where(eq(products.slug, "sac-cartable-clou-noir"));
+    await setStock(db, "sac-cartable-clou-noir", 1);
     let cart = await getCartView(db, cartId);
     expect(cart.lines[0].problem).toBe("insufficient");
     expect(cart.hasProblem).toBe(true);
 
-    await db.update(products).set({ stock: 0 }).where(eq(products.slug, "sac-cartable-clou-noir"));
+    await setStock(db, "sac-cartable-clou-noir", 0);
     cart = await getCartView(db, cartId);
     expect(cart.lines[0].problem).toBe("unavailable");
   });
@@ -132,7 +127,7 @@ describe("panier", () => {
     const user = await registerUser(db, { email: "fusion@exemple.test", password: "mot de passe long", name: "Fusion" });
     const account = await addToCart(db, {
       userId: user.id,
-      productId: (await productBySlug("cabas-double-soufflet-noir")).id,
+      variantId: (await variantOf(db, "cabas-double-soufflet-noir")).id,
       quantity: 2,
     });
     const guest = await cartWith("cabas-double-soufflet-noir", 3);
@@ -188,7 +183,7 @@ describe("commande et réservation de stock", () => {
   it("annule toute la commande si un seul article manque, sans toucher au stock", async () => {
     const { cartId } = await cartWith("cabas-double-soufflet-noir", 2);
     await cartWith("sac-cartable-clou-noir", 3, cartId);
-    await db.update(products).set({ stock: 1 }).where(eq(products.slug, "sac-cartable-clou-noir"));
+    await setStock(db, "sac-cartable-clou-noir", 1);
 
     const soapBefore = await stockOf("cabas-double-soufflet-noir");
     await expect(checkout(cartId)).rejects.toBeInstanceOf(OutOfStockError);
@@ -199,7 +194,7 @@ describe("commande et réservation de stock", () => {
   });
 
   it("ne vend jamais la dernière pièce deux fois, même en simultané", async () => {
-    await db.update(products).set({ stock: 1 }).where(eq(products.slug, "sac-bowling-zip-noir"));
+    await setStock(db, "sac-bowling-zip-noir", 1);
     const carts = await Promise.all(Array.from({ length: 5 }, () => cartWith("sac-bowling-zip-noir", 1)));
 
     const results = await Promise.allSettled(carts.map((cart) => checkout(cart.cartId)));
@@ -309,11 +304,11 @@ describe("paiement", () => {
   });
 
   it("signale un remboursement à faire quand le stock a été vendu entre-temps", async () => {
-    await db.update(products).set({ stock: 1 }).where(eq(products.slug, "sac-bowling-zip-noir"));
+    await setStock(db, "sac-bowling-zip-noir", 1);
     const first = await checkout((await cartWith("sac-bowling-zip-noir", 1)).cartId);
     await expireStaleOrders(db, new Date(Date.now() + 60 * 60 * 1000));
 
-    await db.update(products).set({ stock: 1 }).where(eq(products.slug, "sac-bowling-zip-noir"));
+    await setStock(db, "sac-bowling-zip-noir", 1);
     await checkout((await cartWith("sac-bowling-zip-noir", 1)).cartId);
 
     expect(await markOrderPaid(db, first.id, { reference: "late-2" })).toEqual({ outcome: "needs_refund", reason: "out_of_stock" });
