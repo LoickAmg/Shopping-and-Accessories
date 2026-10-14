@@ -8,7 +8,10 @@
 .home {
   position: relative;
   overflow-x: clip;
+  /* Fond noir propre à l'accueil : le reste du site est ivoire. */
+  background: var(--paper);
 }
+body:has(main > .home) { background: var(--black); }
 
 /* ---------- dôme de photos (fond fixe) ---------- */
 .dome {
@@ -27,7 +30,12 @@
   transform-origin: 50% 40%;
 }
 .dome[data-dragging] { cursor: grabbing; }
-html[data-past-hero] .dome { visibility: hidden; }
+/*
+ * Au-delà du hero, le dôme ne doit plus rien recevoir : ses vignettes forcent
+ * `visibility: visible` en style en ligne (dérive), elles resteraient
+ * cliquables, invisibles, par-dessus le pied de page.
+ */
+html[data-past-hero] .dome { visibility: hidden; pointer-events: none; }
 .dome-stage {
   position: absolute;
   left: 50%;
@@ -45,6 +53,8 @@ html[data-past-hero] .dome { visibility: hidden; }
   backface-visibility: hidden;
   will-change: transform;
   visibility: hidden;
+  /* Le glisser est géré par le conteneur du dôme : les vignettes n'ont jamais à recevoir de clic. */
+  pointer-events: none;
 }
 .dome-tile-inner {
   width: 100%;
@@ -77,7 +87,7 @@ html[data-past-hero] .dome { visibility: hidden; }
   pointer-events: none;
   background:
     radial-gradient(ellipse 75% 70% at 50% 42%, transparent 35%, rgba(5, 5, 5, 0.6) 100%),
-    linear-gradient(to top, #050505 0%, rgba(5, 5, 5, 0.88) 20%, rgba(5, 5, 5, 0.2) 52%, rgba(5, 5, 5, 0) 70%);
+    linear-gradient(to top, #0b0a0a 0%, rgba(11, 10, 10, 0.9) 20%, rgba(11, 10, 10, 0.25) 52%, rgba(11, 10, 10, 0) 70%);
 }
 
 /* ---------- lettres masquées (titres découpés) ---------- */
@@ -120,31 +130,39 @@ html[data-past-hero] .dome { visibility: hidden; }
   opacity: calc(1 - var(--hero-p, 0) * 1.6);
 }
 .hero-kicker {
-  margin: 0 0 1.1rem;
-  font-size: clamp(0.8rem, 1.1vw, 0.95rem);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  margin: 0 0 1.4rem;
+  font-size: clamp(0.62rem, 0.8vw, 0.72rem);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
 }
-.hero-kicker span { color: var(--accent); }
+.hero-kicker span { color: var(--gold); }
 .hero-title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(3rem, 8.6vw, 11rem);
-  line-height: 0.86;
+  font-size: clamp(2.2rem, 5.4vw, 7rem);
+  font-weight: 500;
+  line-height: 1;
   text-transform: uppercase;
-  letter-spacing: -0.005em;
+  letter-spacing: 0.06em;
   white-space: nowrap;
+  text-shadow: 0 4px 40px rgba(0, 0, 0, 0.45);
 }
+/* Le « & » du titre prend l'or du logo. */
+.hero-title .split-word:nth-child(2) .split-letter { color: var(--gold); }
+.hero-ornament { width: min(16rem, 50vw); margin: 1.4rem auto 0.4rem; }
 .hero-script {
   position: relative;
   z-index: 1;
-  margin: -0.26em 0 0;
-  font-family: var(--font-script);
-  font-size: clamp(3.4rem, 7.4vw, 8rem);
-  line-height: 1;
-  color: var(--ink);
-  transform: rotate(-3deg);
-  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.45);
+  margin: 0.2rem 0 0;
+  font-family: var(--font-accent);
+  font-size: clamp(1.4rem, 2.6vw, 2.6rem);
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--gold);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
 }
 .hero-foot {
   position: absolute;
@@ -155,11 +173,14 @@ html[data-past-hero] .dome { visibility: hidden; }
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  font-size: 0.78rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: var(--ink-soft);
 }
-.hero-foot a { color: var(--ink); text-decoration: none; font-weight: 600; }
-.hero-foot a:hover { color: var(--accent-deep); }
+.hero-foot a { color: var(--ink); text-decoration: none; font-weight: 700; }
+.hero-foot a:hover { color: var(--gold); }
 .hero-cue { display: inline-flex; align-items: center; gap: 0.7rem; }
 .hero-cue-line {
   position: relative;
@@ -195,13 +216,14 @@ html[data-past-hero] .dome { visibility: hidden; }
   padding: 18vh clamp(1rem, 4vw, 4rem);
 }
 .lede h2 {
-  max-width: 15.5em;
+  max-width: 17em;
   margin: 0;
-  font-family: var(--font-text);
-  font-size: clamp(1.9rem, 4.4vw, 4.1rem);
+  font-family: var(--font-accent);
+  font-size: clamp(2rem, 4.6vw, 4.4rem);
+  font-style: italic;
   font-weight: 500;
-  line-height: 1.06;
-  letter-spacing: -0.035em;
+  line-height: 1.12;
+  letter-spacing: 0;
   text-align: center;
   text-transform: none;
   color: var(--ink);
@@ -222,19 +244,18 @@ html[data-past-hero] .dome { visibility: hidden; }
   position: sticky;
   top: 22vh;
   margin: 0;
-  font-size: clamp(2.8rem, 5.8vw, 5.8rem);
-  line-height: 0.9;
+  font-size: clamp(1.9rem, 3.6vw, 3.7rem);
+  line-height: 1.12;
 }
-.about-copy p { max-width: 40ch; color: rgba(242, 239, 232, 0.72); font-size: 1.08rem; line-height: 1.65; margin: 0 0 1.4rem; }
-.about-copy .about-lead { color: var(--ink); font-size: clamp(1.3rem, 2vw, 1.65rem); line-height: 1.35; letter-spacing: -0.02em; }
+.about-copy p { max-width: 40ch; color: rgba(246, 241, 234, 0.72); font-size: 1.05rem; line-height: 1.7; margin: 0 0 1.4rem; }
+.about-copy .about-lead { color: var(--ink); font-family: var(--font-accent); font-size: clamp(1.5rem, 2.3vw, 2rem); font-style: italic; line-height: 1.35; letter-spacing: 0; }
 .about-copy .about-sign {
   margin: 2.5rem 0 1.5rem;
-  font-family: var(--font-script);
-  font-size: clamp(3rem, 5.5vw, 4.8rem);
-  line-height: 1;
-  color: var(--accent-deep);
-  transform: rotate(-4deg);
-  transform-origin: left;
+  font-family: var(--font-accent);
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-style: italic;
+  line-height: 1.1;
+  color: var(--gold);
 }
 
 /* ---------- outro ---------- */
@@ -256,18 +277,19 @@ html[data-past-hero] .dome { visibility: hidden; }
   width: 90vmax;
   height: 90vmax;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(216, 177, 106, 0.24) 0%, rgba(226, 87, 156, 0.09) 30%, transparent 62%);
+  background: radial-gradient(circle, rgba(200, 160, 88, 0.22) 0%, rgba(184, 16, 112, 0.14) 32%, transparent 62%);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
 .outro-title {
   position: relative;
   margin: 0 0 3rem;
-  font-size: clamp(3rem, 10vw, 10.5rem);
-  line-height: 0.86;
+  font-size: clamp(2.1rem, 6vw, 6.4rem);
+  line-height: 1.08;
 }
 .outro-title span { display: block; }
-.outro-title span:last-child { color: var(--accent-deep); }
+/* Seconde ligne en dégradé d'or, comme le monogramme du logo. */
+.outro-title span:last-child { background: var(--gold-sheen); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .outro-links { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.8rem; }
 .roll-link {
   display: inline-flex;
@@ -275,14 +297,16 @@ html[data-past-hero] .dome { visibility: hidden; }
   gap: 0.7rem;
   padding: 1rem 1.6rem;
   border-radius: 999px;
-  background: var(--ink);
-  color: #0a0a0a;
-  font-size: 1.05rem;
+  background: var(--ivory);
+  color: var(--black);
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   text-decoration: none;
-  transition: transform 0.4s var(--ease-out), background 0.3s ease;
+  transition: transform 0.4s var(--ease-out), background 0.3s ease, color 0.3s ease;
 }
-.roll-link:hover { color: #0a0a0a; background: var(--accent-deep); transform: translateY(-2px); }
+.roll-link:hover { color: var(--white); background: var(--rose); transform: translateY(-2px); }
 .roll { display: inline-flex; height: 1.2em; line-height: 1.2em; overflow: hidden; }
 .roll-ch {
   display: inline-flex;
@@ -297,14 +321,15 @@ html[data-past-hero] .dome { visibility: hidden; }
   display: inline-flex;
   padding: 1rem 1.6rem;
   border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(242, 239, 232, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(200, 160, 88, 0.45);
   color: var(--ink);
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-weight: 600;
+  letter-spacing: 0.04em;
   text-decoration: none;
   transition: box-shadow 0.3s ease;
 }
-.copy-email:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.copy-email:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--gold); }
 .copy-email-stack { display: grid; height: 1.3em; line-height: 1.3em; overflow: hidden; }
 .copy-email-stack span { grid-area: 1 / 1; transition: transform 0.5s var(--ease-out); }
 .copy-email-stack span:nth-child(2),
@@ -314,7 +339,7 @@ html[data-past-hero] .dome { visibility: hidden; }
 .copy-email:hover .copy-email-stack span:nth-child(2) { transform: none; }
 .copy-email[data-state="copied"] .copy-email-stack span:nth-child(2) { transform: translateY(-110%); }
 .copy-email[data-state="copied"] .copy-email-stack span:nth-child(3) { transform: none; color: var(--accent-deep); }
-.outro-fine { position: absolute; bottom: 1.6rem; margin: 0; color: var(--ink-soft); font-size: 0.75rem; }
+.outro-fine { position: absolute; bottom: 1.6rem; margin: 0; color: var(--ink-soft); font-size: 0.66rem; letter-spacing: 0.2em; text-transform: uppercase; }
 
 /* ==========================================================================
    Animations (uniquement avec JavaScript et mouvement accepté)
@@ -322,6 +347,7 @@ html[data-past-hero] .dome { visibility: hidden; }
 @media (prefers-reduced-motion: no-preference) {
   .hero-kicker { animation: rise 1s var(--ease-out) 0.15s both; }
   .hero-title .split-letter { animation: letter-rise 1.25s var(--ease-out) calc(0.25s + var(--i) * 38ms) both; }
+  .hero-ornament { animation: ornament-in 1.2s var(--ease-out) 0.95s both; }
   .hero-script { animation: write 1.8s var(--ease-in-out) 1.15s both; }
   .hero-foot { animation: fade 1.2s ease 1.6s both; }
 
@@ -366,8 +392,9 @@ html[data-past-hero] .dome { visibility: hidden; }
 /* ---------- adaptatif ---------- */
 @media (max-width: 48rem) {
   .hero { padding-bottom: 7.5rem; }
-  .hero-title { white-space: normal; font-size: clamp(3rem, 16vw, 6rem); line-height: 0.88; }
-  .hero-script { font-size: clamp(2.8rem, 14vw, 4.5rem); margin-top: -0.3em; }
+  .hero-title { white-space: normal; font-size: clamp(1.9rem, 9.5vw, 3.4rem); line-height: 1.08; }
+  .hero-script { font-size: clamp(1.25rem, 5.6vw, 1.8rem); margin-top: 0; }
+  .hero-ornament { margin-top: 1rem; }
   .hero-foot { bottom: 5.4rem; justify-content: center; }
   .hero-foot > :not(.hero-cue) { display: none; }
   .about-grid { grid-template-columns: 1fr; }
@@ -383,4 +410,9 @@ html[data-past-hero] .dome { visibility: hidden; }
 @media (max-width: 48rem) {
   body:has(.demo-notice) .hero { padding-bottom: 10.5rem; }
   body:has(.demo-notice) .hero-foot { bottom: 8.4rem; }
+}
+
+/* L'ornement du hero se déploie depuis son losange central. */
+@keyframes ornament-in {
+  from { opacity: 0; transform: scaleX(0.2); }
 }

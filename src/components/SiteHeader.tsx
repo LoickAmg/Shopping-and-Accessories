@@ -17,8 +17,12 @@ export function SiteHeader({ cartCount, user, currencies, currentCurrency }: Pro
   return (
     <header className="site-header">
       <Link href="/" className="brand" aria-label={`${store.name}, accueil`}>
-        <span className="brand-script" aria-hidden="true">Shopping</span>
-        <span className="brand-amp" aria-hidden="true">&amp; Accessories</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="brand-emblem" src="/assets/logo-emblem.png" alt="" width={122} height={160} />
+        <span className="brand-words" aria-hidden="true">
+          <span className="brand-shopping">Shopping</span>
+          <span className="brand-amp">&amp; Accessories</span>
+        </span>
       </Link>
       <PillNav />
       <div className="header-tools">

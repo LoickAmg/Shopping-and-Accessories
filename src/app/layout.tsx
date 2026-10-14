@@ -1,15 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 
-import "@fontsource/anton/400.css";
-import "@fontsource/bricolage-grotesque/600.css";
-import "@fontsource/fraunces/400.css";
-import "@fontsource/fraunces/600.css";
+import "@fontsource/cinzel/400.css";
+import "@fontsource/cinzel/500.css";
+import "@fontsource/cinzel/600.css";
+import "@fontsource/cormorant-garamond/500.css";
+import "@fontsource/cormorant-garamond/400-italic.css";
+import "@fontsource/cormorant-garamond/500-italic.css";
 import "@fontsource/hanken-grotesk/400.css";
 import "@fontsource/hanken-grotesk/600.css";
 import "@fontsource/hanken-grotesk/700.css";
-import "@fontsource/mrs-saint-delafield/400.css";
-import "@fontsource/young-serif/400.css";
 
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -33,9 +33,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // La direction artistique est sombre quel que soit le preset : barre du navigateur assortie.
+  // Barre du navigateur noire, assortie à l'en-tête et au logo ; pages claires (formulaires en thème clair).
   themeColor: "#050505",
-  colorScheme: "dark",
+  colorScheme: "light",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

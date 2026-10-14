@@ -21,32 +21,32 @@ import "./home-sheet.css";
 const CRAFT: CraftValue[] = [
   {
     word: "Matière",
-    lead: "Tout commence par ce que l'on touche. Nous retenons des cuirs qui ont de la main et qui se patinent au lieu de s'user.",
+    lead: "Tout commence par ce que l'on touche : un coton qui tient, un lin qui respire, un cuir qui se patine.",
     image: catalogImages[0],
     details: [
-      { title: "Cuir pleine fleur", text: "La couche la plus noble de la peau : souple, dense, elle se bonifie avec le temps." },
-      { title: "Grains et embossages", text: "Grain serré, saffiano ou croco : des surfaces qui résistent aux rayures du quotidien." },
-      { title: "Doublures soignées", text: "Un intérieur net et contrasté, pour retrouver ses affaires d'un coup d'œil." },
+      { title: "Fibres naturelles", text: "Coton, lin, laine : des matières qui respirent et se portent longtemps." },
+      { title: "Cuirs et embossages", text: "Grain serré, saffiano ou croco : des surfaces qui résistent au quotidien." },
+      { title: "Métaux des bijoux", text: "Acier inoxydable, plaqué or, argent : la matière est indiquée sur chaque fiche." },
     ],
   },
   {
     word: "Ligne",
-    lead: "Une silhouette se juge de loin. Structurée ou souple, chaque forme est choisie pour tomber juste, à la main comme à l'épaule.",
+    lead: "Une coupe se juge de loin : ajustée ou ample, chaque pièce est choisie pour tomber juste, de jour comme de soir.",
     image: catalogImages[3],
     details: [
-      { title: "Tenue", text: "Des flancs renforcés qui gardent la forme, même vide, même posé." },
-      { title: "Proportions", text: "Des volumes pensés pour un format A4, un ordinateur fin ou l'essentiel du soir." },
+      { title: "Coupes", text: "Ajustées ou amples, des silhouettes pensées pour bouger avec vous." },
+      { title: "Du XS au XXL", text: "Des tailles de l'enfant à l'adulte, indiquées sur chaque fiche avec leur disponibilité." },
       { title: "Portés multiples", text: "Anse courte, bandoulière, chaîne : un même sac, plusieurs façons de le porter." },
     ],
   },
   {
     word: "Détail",
-    lead: "Ce qui fait la différence se voit de près : l'éclat d'un fermoir, la régularité d'une couture, le poids d'une boucle.",
+    lead: "Ce qui fait la différence se voit de près : une couture régulière, un bouton bien cousu, un fermoir qui accroche la lumière.",
     image: catalogImages[4],
     details: [
-      { title: "Métal doré", text: "Fermoirs, zips et chaînes à la finition dorée, assortis d'un sac à l'autre." },
-      { title: "Coutures régulières", text: "Des points serrés et droits, là où le sac travaille le plus." },
-      { title: "Anses gainées", text: "Roulottées ou nouées, pensées pour le confort de la main." },
+      { title: "Finitions", text: "Coutures régulières et ourlets nets, là où une pièce travaille le plus." },
+      { title: "Boutons et fermoirs", text: "Les petites pièces de métal qui font la grande différence d'une tenue." },
+      { title: "Friperie décrite honnêtement", text: "L'état d'usure et les défauts éventuels sont indiqués sur chaque fiche de seconde main." },
     ],
   },
   {
@@ -55,22 +55,13 @@ const CRAFT: CraftValue[] = [
     image: catalogImages[6],
     details: [
       { title: "Intemporel", text: "Des couleurs profondes et des formes classiques qui ne datent pas une tenue." },
-      { title: "Du jour au soir", text: "Un détail doré suffit à faire passer un sac de la journée à la soirée." },
-      { title: "Peu, mais bien", text: "Une sélection courte : chaque modèle a une raison d'être là." },
+      { title: "Du jour au soir", text: "Un détail doré suffit à faire passer une tenue de la journée à la soirée." },
+      { title: "Neuf, friperie ou fin de série", text: "Trois façons de s'habiller avec style, selon votre budget." },
     ],
   },
 ];
 
-const MARQUEE = [
-  "Cuir pleine fleur",
-  "Fermoirs dorés",
-  "Coutures régulières",
-  "Chaînes amovibles",
-  "Doublures contrastées",
-  "Anses gainées",
-  "Embossage croco",
-  "Livraison soignée",
-];
+const MARQUEE = ["Femme", "Homme", "Enfant", "Friperie", "Fins de série", "Bijoux", "Sacs", "Du XS au XXL", "Livraison soignée"];
 
 export default async function HomePage() {
   const db = await getDb();
@@ -122,12 +113,13 @@ export default async function HomePage() {
 
       <section className="hero" id="intro" aria-labelledby="hero-title">
         <p className="hero-kicker">
-          Sacs &amp; accessoires choisis <span aria-hidden="true">→</span> livrés chez vous
+          Mode, friperie &amp; bijoux choisis <span aria-hidden="true">→</span> livrés chez vous
         </p>
         <SplitLetters as="h1" id="hero-title" className="hero-title" text={store.name} />
-        <p className="hero-script" aria-hidden="true">
-          Boutique de mode
-        </p>
+        <div className="ornament hero-ornament" aria-hidden="true">
+          <span />
+        </div>
+        <p className="hero-script">Boutique de Mode &amp; Accessoires</p>
         <div className="hero-foot">
           <span>Collection {year}</span>
           <a href="#savoir-faire" className="hero-cue">
@@ -141,7 +133,7 @@ export default async function HomePage() {
       <div className="home-body">
         <section className="lede" id="savoir-faire" data-lede aria-label="Notre exigence">
           <h2>
-            <ScrollText text="Un sac qu'on garde des années ne doit rien au hasard. Il exige :" />
+            <ScrollText text="Une pièce qu'on garde des années ne doit rien au hasard. Elle exige :" />
           </h2>
         </section>
 
@@ -196,7 +188,7 @@ export default async function HomePage() {
                 <div className="spotlight-copy">
                   <p className="sheet-eyebrow">Nouvelle collection · Automne — Hiver {year}</p>
                   <h2 id="spotlight-title" className="spotlight-title">
-                    Le cuir, <em>en majesté</em>
+                    La pièce, <em>en majesté</em>
                   </h2>
                   <p className="spotlight-text">
                     {spotlight.summary || "Une pièce choisie pour sa tenue et ses finitions."} À découvrir :{" "}

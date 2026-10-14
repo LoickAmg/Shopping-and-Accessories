@@ -6,10 +6,14 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="site-footer-inner">
-        <div>
-          <p className="wordmark" style={{ margin: 0 }}>
-            {store.name}
+        <div className="footer-brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="footer-emblem" src="/assets/logo-emblem.png" alt="" width={122} height={160} loading="lazy" />
+          <p className="wordmark">
+            <span className="brand-shopping">Shopping</span>
+            <span className="brand-amp">&amp; Accessories</span>
           </p>
+          <p className="footer-tagline">Boutique de Mode &amp; Accessoires</p>
           <p className="muted" style={{ maxWidth: "32ch" }}>
             {store.tagline}
           </p>
