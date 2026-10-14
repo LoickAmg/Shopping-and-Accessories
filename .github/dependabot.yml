@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Correctifs de dépendances npm proposés chaque semaine, regroupés pour limiter le bruit.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dependances:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

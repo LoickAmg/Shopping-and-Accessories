@@ -1,5 +1,7 @@
 # Shopping & Accessories
 
+[![CI](https://github.com/LoickAmg/Shopping-and-Accessories/actions/workflows/ci.yml/badge.svg)](https://github.com/LoickAmg/Shopping-and-Accessories/actions/workflows/ci.yml)
+
 Boutique en ligne de sacs et d'accessoires de mode : vitrine immersive, catalogue, panier, comptes clients, commande avec réservation de stock, paiement et back-office. Le site se déploie gratuitement sur Vercel avec une base Postgres Neon.
 
 - [Aperçu](#aperçu)
@@ -12,6 +14,7 @@ Boutique en ligne de sacs et d'accessoires de mode : vitrine immersive, catalogu
 - [Paiement](#paiement)
 - [Devises](#devises)
 - [Sécurité](#sécurité)
+- [Intégration continue](#intégration-continue)
 - [Limites connues](#limites-connues)
 
 ## Aperçu
@@ -190,12 +193,26 @@ Un sélecteur apparaît alors dans l'en-tête. Le client est facturé dans la de
 
 ## Sécurité
 
-- Les actions du back-office sont revérifiées côté serveur, pas seulement masquées dans l'interface.
+- Chaque page et chaque action du back-office vérifie elle-même le rôle d'administrateur. Le layout `/admin` ne suffit pas : Next.js rend les pages en parallèle du layout, et une page non protégée enverrait ses données même quand le layout redirige. Un test (`tests/admin-guard.test.ts`) échoue si une page ou une action oublie cette vérification.
 - Les sessions utilisent un jeton haché et les mots de passe sont hachés avec `scrypt`.
 - Une limitation de débit en base protège la connexion, l'inscription et la commande, sans stocker d'adresse IP ni d'e-mail en clair.
 - Les redirections de retour sont limitées aux chemins internes. Une commande n'est consultable sans compte qu'avec son jeton secret.
 - Le site envoie des en-têtes de sécurité, et les pages privées ne sont pas indexées.
 - Un paiement reçu pour une commande qu'on ne peut plus honorer est signalé « remboursement à faire » dans le back-office.
+- Une variable d'environnement vide ou invalide (devise, langue, durée de réservation, moyens de paiement) reprend sa valeur par défaut au lieu de casser le site.
+- Sur Vercel, le build de production s'arrête avant toute migration si une variable obligatoire manque.
+
+## Intégration continue
+
+À chaque envoi sur `main` et à chaque pull request, GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) lance :
+
+1. le lint (`npm run lint`) ;
+2. la vérification des types (`npm run typecheck`) ;
+3. les tests (`npm test`) ;
+4. une construction complète du site (`next build`) ;
+5. en parallèle, `npm audit` sur les dépendances de production, qui échoue sur toute faille haute ou critique.
+
+Dependabot propose chaque semaine les mises à jour de dépendances et d'actions GitHub. Les mises à jour mineures et correctives de npm sont regroupées dans une même pull request ; les versions majeures arrivent séparément.
 
 ## Limites connues
 
