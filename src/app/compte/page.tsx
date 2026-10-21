@@ -11,14 +11,20 @@ import { listOrdersForUser } from "@/server/orders";
 
 export const metadata: Metadata = { title: "Mon compte", robots: { index: false } };
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: PageProps<"/compte">) {
   const user = await getCurrentUser();
   if (!user) redirect("/compte/connexion");
+  const query = await searchParams;
 
   const orders = await listOrdersForUser(await getDb(), user.id);
 
   return (
     <>
+      {query["mot-de-passe-change"] && (
+        <p className="notice notice-ok" role="status">
+          Mot de passe changé.
+        </p>
+      )}
       <div className="page-head">
         <div>
           <p className="eyebrow">Mon compte</p>

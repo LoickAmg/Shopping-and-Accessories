@@ -73,15 +73,33 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/comma
           </div>
 
           <h2 style={{ marginTop: "var(--space-6)" }}>Actions</h2>
+
+          {order.status === "paid" && (
+            <form action={orderAdminAction} className="stack" style={{ marginBottom: "var(--space-5)", maxWidth: "26rem" }}>
+              <h3>Expédier</h3>
+              <p className="muted small">Le client reçoit un e-mail de confirmation avec le suivi, s&apos;il est renseigné.</p>
+              <input type="hidden" name="orderId" value={order.id} />
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="trackingCarrier">Transporteur (facultatif)</label>
+                  <input id="trackingCarrier" name="trackingCarrier" maxLength={60} placeholder="ex : Colissimo" />
+                </div>
+                <div className="field">
+                  <label htmlFor="trackingNumber">Numéro de suivi (facultatif)</label>
+                  <input id="trackingNumber" name="trackingNumber" maxLength={80} />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="trackingUrl">Lien de suivi (facultatif)</label>
+                <input id="trackingUrl" name="trackingUrl" type="text" inputMode="url" maxLength={300} placeholder="https://…" />
+              </div>
+              <button type="submit" name="action" value="fulfill" className="button">
+                Marquer comme expédiée
+              </button>
+            </form>
+          )}
+
           <div className="actions">
-            {order.status === "paid" && (
-              <form action={orderAdminAction}>
-                <input type="hidden" name="orderId" value={order.id} />
-                <button type="submit" name="action" value="fulfill" className="button">
-                  Marquer comme expédiée
-                </button>
-              </form>
-            )}
             {(order.status === "pending" || order.status === "paid") && (
               <form action={orderAdminAction}>
                 <input type="hidden" name="orderId" value={order.id} />
@@ -133,6 +151,30 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/comma
               <div className="row">
                 <dt>Payée le</dt>
                 <dd>{formatDate(order.paidAt)}</dd>
+              </div>
+            )}
+            {order.shippedAt && (
+              <div className="row">
+                <dt>Expédiée le</dt>
+                <dd>
+                  {formatDate(order.shippedAt)}
+                  {(order.trackingCarrier || order.trackingNumber) && (
+                    <>
+                      <br />
+                      <span className="muted small">
+                        {[order.trackingCarrier, order.trackingNumber].filter(Boolean).join(" · ")}
+                      </span>
+                    </>
+                  )}
+                  {order.trackingUrl && (
+                    <>
+                      <br />
+                      <a href={order.trackingUrl} target="_blank" rel="noreferrer noopener" className="small">
+                        Suivre le colis ↗
+                      </a>
+                    </>
+                  )}
+                </dd>
               </div>
             )}
             <div className="row">

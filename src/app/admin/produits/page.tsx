@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { duplicateProductAction, toggleProductAction } from "@/app/actions/admin";
 import { AdminPager, currentPath, pageParam, param } from "@/components/AdminPager";
+import { CatalogueImportExport } from "@/components/CatalogueImportExport";
 import { getDb } from "@/db/client";
 import { money } from "@/lib/format";
 import { CONDITION_LABELS } from "@/lib/taxonomy";
@@ -39,9 +40,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
     <>
       <div className="page-head">
         <h1>Produits</h1>
-        <Link href="/admin/produits/nouveau" className="button">
-          Nouveau produit
-        </Link>
+        <div className="actions">
+          <CatalogueImportExport exportHref={`/api/admin/catalogue/export?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value) as [string, string][]).toString()}`} />
+          <Link href="/admin/produits/nouveau" className="button">
+            Nouveau produit
+          </Link>
+        </div>
       </div>
 
       {query.enregistre && (

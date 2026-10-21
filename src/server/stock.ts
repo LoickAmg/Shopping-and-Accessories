@@ -8,6 +8,7 @@ import { variantLabel } from "@/lib/taxonomy";
 
 import { LOW_STOCK_THRESHOLD } from "./admin";
 import { escapeLike } from "./catalog";
+import { notifyLowStock } from "./stock-alerts";
 
 /** Base de données ou transaction : les deux exposent les mêmes requêtes. */
 type Executor = Pick<Db, "insert" | "update" | "select" | "execute">;
@@ -63,6 +64,7 @@ export async function adjustStock(db: Db, changes: StockChange[], actorId: strin
     await recordMovement(db, { variantId: change.variantId, delta, stockAfter: row.stock, reason: "ajustement", actorId });
     result.applied.push({ variantId: change.variantId, delta, stock: row.stock });
   }
+  if (result.applied.some((line) => line.delta < 0)) void notifyLowStock(db).catch(() => undefined);
   return result;
 }
 

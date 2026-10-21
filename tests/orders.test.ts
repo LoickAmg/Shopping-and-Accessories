@@ -342,10 +342,18 @@ describe("annulation et expédition", () => {
 
   it("n'expédie qu'une commande payée, et ne l'annule plus ensuite", async () => {
     const order = await checkout((await cartWith("cabas-double-soufflet-noir", 1)).cartId);
-    expect(await fulfillOrder(db, order.id)).toBe(false);
+    expect(await fulfillOrder(db, order.id)).toBeUndefined();
     await markOrderPaid(db, order.id, { reference: "r" });
-    expect(await fulfillOrder(db, order.id)).toBe(true);
+    expect((await fulfillOrder(db, order.id))?.status).toBe("fulfilled");
     expect(await cancelOrder(db, order.id)).toBe(false);
+  });
+
+  it("enregistre le suivi d'expédition quand il est renseigné", async () => {
+    const order = await checkout((await cartWith("cabas-double-soufflet-noir", 1)).cartId);
+    await markOrderPaid(db, order.id, { reference: "r" });
+    const shipped = await fulfillOrder(db, order.id, { carrier: "Colissimo", number: "1Z999", url: "https://suivi.test" });
+    expect(shipped).toMatchObject({ status: "fulfilled", trackingCarrier: "Colissimo", trackingNumber: "1Z999", trackingUrl: "https://suivi.test" });
+    expect(shipped?.shippedAt).toBeInstanceOf(Date);
   });
 });
 

@@ -43,6 +43,20 @@
       "when": 1792605055575,
       "tag": "0005_gestion_equipe_et_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792618089691,
+      "tag": "0006_expedition_et_mot_de_passe",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792618406995,
+      "tag": "0007_alertes_stock",
+      "breakpoints": true
     }
   ]
 }

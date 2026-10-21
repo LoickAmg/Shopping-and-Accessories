@@ -2,7 +2,7 @@ import { store } from "@/config/store";
 import { orderMoney } from "@/lib/format";
 import { siteUrl } from "@/payments/registry";
 
-import type { OrderWithItems } from "./orders";
+import type { OrderWithItems, Tracking } from "./orders";
 
 export interface Email {
   to: string;
@@ -77,6 +77,36 @@ export function orderConfirmationEmail(order: OrderWithItems): Email {
   };
 }
 
+/** E-mail envoyé quand la commande passe en « expédiée », avec le suivi s'il est renseigné. */
+export function orderShippedEmail(order: OrderWithItems, tracking: Tracking): Email {
+  const link = `${siteUrl()}/commande/${order.id}?token=${order.accessToken}`;
+  const trackingLines =
+    tracking.carrier || tracking.number
+      ? [
+          "",
+          "Suivi du colis :",
+          ...(tracking.carrier ? [`Transporteur : ${tracking.carrier}`] : []),
+          ...(tracking.number ? [`Numéro : ${tracking.number}`] : []),
+          ...(tracking.url ? [tracking.url] : []),
+        ]
+      : [];
+
+  return {
+    to: order.email,
+    subject: `Commande n° ${order.number} expédiée — ${store.name}`,
+    text: [
+      `Bonjour ${order.customerName},`,
+      "",
+      `Votre commande n° ${order.number} vient d'être expédiée.`,
+      ...trackingLines,
+      "",
+      `Suivre la commande : ${link}`,
+      "",
+      store.name,
+    ].join("\n"),
+  };
+}
+
 /** Envoie la confirmation ; une panne d'e-mail ne doit jamais faire échouer un paiement déjà encaissé. */
 export async function sendOrderConfirmation(order: OrderWithItems, mailer: Mailer = getMailer()): Promise<boolean> {
   try {
@@ -84,6 +114,17 @@ export async function sendOrderConfirmation(order: OrderWithItems, mailer: Maile
     return true;
   } catch (error) {
     console.error("Confirmation de commande non envoyée :", error);
+    return false;
+  }
+}
+
+/** Envoie l'e-mail d'expédition ; une panne d'e-mail ne doit jamais faire échouer l'expédition déjà enregistrée. */
+export async function sendOrderShipped(order: OrderWithItems, tracking: Tracking, mailer: Mailer = getMailer()): Promise<boolean> {
+  try {
+    await mailer.send(orderShippedEmail(order, tracking));
+    return true;
+  } catch (error) {
+    console.error("E-mail d'expédition non envoyé :", error);
     return false;
   }
 }

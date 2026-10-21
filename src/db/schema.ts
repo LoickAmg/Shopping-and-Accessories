@@ -154,6 +154,25 @@ export const sessions = pgTable(
   (table) => [index("sessions_user_idx").on(table.userId)],
 );
 
+/**
+ * Demandes de réinitialisation du mot de passe. Comme pour les sessions, seule
+ * l'empreinte SHA-256 du jeton envoyé par e-mail est stockée ; un jeton sert
+ * une seule fois et expire vite.
+ */
+export const passwordResets = pgTable(
+  "password_resets",
+  {
+    id: text("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("password_resets_user_idx").on(table.userId)],
+);
+
 export const carts = pgTable("carts", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
@@ -203,6 +222,11 @@ export const orders = pgTable(
     /** Au-delà, une commande impayée est annulée et son stock restitué. */
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Expédition : transporteur, numéro et lien de suivi, communiqués au client par e-mail. */
+    shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    trackingCarrier: text("tracking_carrier").notNull().default(""),
+    trackingNumber: text("tracking_number").notNull().default(""),
+    trackingUrl: text("tracking_url").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -318,6 +342,18 @@ export const stockMovements = pgTable(
   },
   (table) => [index("stock_movements_variant_idx").on(table.variantId), index("stock_movements_created_idx").on(table.createdAt)],
 );
+
+/**
+ * Dernière alerte « stock bas » envoyée pour une déclinaison : évite de
+ * réexpédier le même e-mail à chaque vente tant que le stock reste bas. La
+ * ligne est supprimée dès que le stock remonte au-dessus du seuil.
+ */
+export const stockAlerts = pgTable("stock_alerts", {
+  variantId: integer("variant_id")
+    .primaryKey()
+    .references(() => productVariants.id, { onDelete: "cascade" }),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export type AuditEntry = typeof auditLog.$inferSelect;
 export type StockMovement = typeof stockMovements.$inferSelect;

@@ -29,6 +29,7 @@ import type { ProductInput } from "@/server/admin";
 import { logAction } from "@/server/audit";
 import { requireAdmin, requireStaff } from "@/server/guard";
 import { cancelOrder, fulfillOrder, getOrder, markOrderPaidManually, markOrderRefunded } from "@/server/orders";
+import { sendOrderShipped } from "@/server/mailer";
 import { adjustStock } from "@/server/stock";
 import type { StockChange } from "@/server/stock";
 import { setUserRole, setUserSuspended } from "@/server/users";
@@ -269,8 +270,21 @@ export async function orderAdminAction(formData: FormData): Promise<void> {
   if (!order) redirect("/admin/commandes");
   let done = false;
   let detail = `Commande n° ${order.number}`;
-  if (action === "fulfill") done = await fulfillOrder(db, orderId);
-  else if (action === "cancel") done = await cancelOrder(db, orderId);
+  if (action === "fulfill") {
+    const trackingUrlRaw = String(formData.get("trackingUrl") ?? "").trim().slice(0, 300);
+    const tracking = {
+      carrier: String(formData.get("trackingCarrier") ?? "").trim().slice(0, 60),
+      number: String(formData.get("trackingNumber") ?? "").trim().slice(0, 80),
+      // Seules les adresses http(s) sont acceptées : un lien "javascript:" ne doit jamais atterrir dans un href.
+      url: /^https?:\/\//i.test(trackingUrlRaw) ? trackingUrlRaw : "",
+    };
+    const shipped = await fulfillOrder(db, orderId, tracking);
+    done = Boolean(shipped);
+    if (shipped) {
+      await sendOrderShipped(shipped, tracking);
+      detail += tracking.number ? ` — ${tracking.carrier || "suivi"} ${tracking.number}` : "";
+    }
+  } else if (action === "cancel") done = await cancelOrder(db, orderId);
   else if (action === "refund") done = await markOrderRefunded(db, orderId);
   else if (action === "manual-pay") {
     const note = String(formData.get("note") ?? "").trim().slice(0, 80);

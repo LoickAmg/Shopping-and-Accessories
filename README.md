@@ -53,6 +53,10 @@ Les animations respectent le réglage « réduire les animations » du système.
   - rayons, commandes (expédier, annuler, encaisser hors ligne, solder un remboursement) et devises ;
   - équipe : rôles Gestionnaire et Administrateur, suspension d'un compte, et journal d'activité (qui a fait quoi, quand).
 - **Rôles** : le *gestionnaire* gère produits, photos, stock, rayons et commandes ; l'*administrateur* a en plus les encaissements et remboursements, les devises, les comptes et le journal. La boutique garde toujours au moins un administrateur actif.
+- **Import / export Excel** : le catalogue s'exporte en un classeur `.xlsx` (une ligne par taille/couleur, avec un mode d'emploi et la liste des rayons dans des feuilles à part). Modifié puis réimporté, un aperçu montre d'abord ce qui va changer — rien n'est enregistré avant confirmation. Un `.csv` exporté d'Excel est aussi accepté.
+- **Alerte de stock bas par e-mail** : en plus du tableau de bord, l'équipe (gestionnaires et administrateurs) reçoit un e-mail dès qu'un article passe sous le seuil d'alerte, après une vente ou une correction de stock. Un seul envoi par article tant qu'il reste bas ; une nouvelle alerte seulement après un réapprovisionnement suivi d'une nouvelle baisse.
+- **Expédition avec suivi** : marquer une commande comme expédiée propose un transporteur, un numéro et un lien de suivi (facultatifs) ; le client reçoit un e-mail de confirmation avec ces informations.
+- **Mot de passe oublié** : un lien « Mot de passe oublié ? » envoie un e-mail à usage unique, valable une heure, pour choisir un nouveau mot de passe. La réponse ne révèle jamais si l'adresse existe.
 - **Pages légales** : mentions légales, conditions de vente, confidentialité, livraison et retours, contact, à propos. L'identité du vendeur vient des variables d'environnement.
 - **Accessibilité et référencement** : navigation au clavier, lien d'évitement, formulaires étiquetés avec erreurs annoncées, `robots.txt`, `sitemap.xml`, Open Graph.
 
@@ -163,7 +167,7 @@ Le fichier `.env.example` liste toutes les variables, avec un commentaire pour c
 | `SHOP_COUNTRIES` | Pays livrés, en codes ISO séparés par des virgules |
 | `SHOP_DEMO_NOTICE` | `false` pour passer en vente réelle |
 | `PAYMENT_PROVIDERS` | `demo`, `stripe`, ou les deux |
-| `RESEND_API_KEY`, `MAIL_FROM` | Envoi réel des e-mails de confirmation |
+| `RESEND_API_KEY`, `MAIL_FROM` | Envoi réel des e-mails (confirmation, expédition, stock bas, mot de passe) |
 | `BLOB_READ_WRITE_TOKEN` | Stockage des photos envoyées depuis le back-office (Vercel Blob) |
 | `SITE_URL` | URL publique (déduite automatiquement sur Vercel) |
 
@@ -207,6 +211,8 @@ Un sélecteur apparaît alors dans l'en-tête. Le client est facturé dans la de
 - Un compte suspendu perd immédiatement ses sessions. Un administrateur ne peut ni modifier son propre rôle ni retirer le dernier administrateur actif (vérifié dans la même requête SQL que la modification).
 - L'envoi de photos vérifie le rôle, l'origine de la requête, la taille (4 Mo) et le type réel du fichier, lu dans ses premiers octets (JPEG, PNG ou WebP seulement).
 - Les corrections de stock s'appliquent en écart (saisi − affiché) : une vente passée pendant que la page était ouverte n'est jamais effacée.
+- Les liens de réinitialisation du mot de passe sont à usage unique, expirent après une heure, et seule leur empreinte est stockée en base (comme les sessions). Une demande sur une adresse inconnue ou suspendue ne révèle rien et n'envoie rien.
+- Un fichier importé (catalogue, photo) est limité en taille et en lignes ; son contenu est validé avant lecture, et une archive piégée qui tenterait de se décompresser en gigaoctets est refusée.
 - Les sessions utilisent un jeton haché et les mots de passe sont hachés avec `scrypt`.
 - Une limitation de débit en base protège la connexion, l'inscription et la commande, sans stocker d'adresse IP ni d'e-mail en clair.
 - Les redirections de retour sont limitées aux chemins internes. Une commande n'est consultable sans compte qu'avec son jeton secret.

@@ -58,6 +58,11 @@ export function AuthForm({ mode, returnTo }: { mode: "login" | "register"; retur
             {errors.password}
           </p>
         )}
+        {!register && (
+          <p className="field-hint">
+            <Link href="/compte/mot-de-passe-oublie">Mot de passe oublié ?</Link>
+          </p>
+        )}
       </div>
 
       <div className="actions">

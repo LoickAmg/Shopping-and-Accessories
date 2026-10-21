@@ -10,6 +10,7 @@ import type { RateTarget } from "@/lib/currency";
 import { variantLabel } from "@/lib/taxonomy";
 
 import { computeTotals } from "./pricing";
+import { notifyLowStock } from "./stock-alerts";
 import { recordMovement } from "./stock";
 import type { ShippingRules } from "./pricing";
 
@@ -157,6 +158,9 @@ export async function createOrder(db: Db, input: CreateOrderInput): Promise<Orde
     }
     await tx.delete(cartItems).where(eq(cartItems.cartId, input.cartId));
     return { ...order, items };
+  }).then(async (created) => {
+    void notifyLowStock(db).catch(() => undefined);
+    return created;
   });
 }
 
@@ -261,6 +265,7 @@ export async function markOrderPaid(db: Db, orderId: string, payment: { referenc
         .set({ status: "paid", paidAt: new Date(), paymentReference: payment.reference })
         .where(and(eq(orders.id, orderId), eq(orders.status, "expired")));
     });
+    void notifyLowStock(db).catch(() => undefined);
     return { outcome: "paid_after_expiry" };
   } catch (error) {
     if (!(error instanceof LateStockError)) throw error;
@@ -322,14 +327,26 @@ export async function markOrderPaidManually(db: Db, orderId: string, note: strin
   return markOrderPaid(db, orderId, { reference: `manuel:${note.trim().slice(0, 80) || "sans référence"}` });
 }
 
-/** Passe une commande payée en « expédiée ». */
-export async function fulfillOrder(db: Db, orderId: string): Promise<boolean> {
-  const done = await db
+export interface Tracking {
+  carrier: string;
+  number: string;
+  url: string;
+}
+
+/** Passe une commande payée en « expédiée », avec un suivi facultatif (transporteur, numéro, lien). */
+export async function fulfillOrder(db: Db, orderId: string, tracking: Tracking = { carrier: "", number: "", url: "" }): Promise<OrderWithItems | undefined> {
+  const [done] = await db
     .update(orders)
-    .set({ status: "fulfilled" })
+    .set({
+      status: "fulfilled",
+      shippedAt: new Date(),
+      trackingCarrier: tracking.carrier.trim().slice(0, 60),
+      trackingNumber: tracking.number.trim().slice(0, 80),
+      trackingUrl: tracking.url.trim().slice(0, 300),
+    })
     .where(and(eq(orders.id, orderId), eq(orders.status, "paid")))
-    .returning({ id: orders.id });
-  return done.length > 0;
+    .returning();
+  return done ? withItems(db, done) : undefined;
 }
 
 async function withItems(db: Db, order: Order): Promise<OrderWithItems> {

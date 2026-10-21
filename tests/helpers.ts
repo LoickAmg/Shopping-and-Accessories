@@ -25,7 +25,7 @@ export async function createTestDb(options: { seeded?: boolean } = {}): Promise<
  */
 export async function resetDb(db: Db, options: { seeded?: boolean } = {}): Promise<void> {
   await db.execute(sql`
-    truncate table audit_log, stock_movements, payment_events, order_items, orders, cart_items, carts, sessions, users, product_variants, products, categories, rate_limits, currencies
+    truncate table stock_alerts, password_resets, audit_log, stock_movements, payment_events, order_items, orders, cart_items, carts, sessions, users, product_variants, products, categories, rate_limits, currencies
     restart identity cascade
   `);
   await ensureCurrenciesSeeded(db);

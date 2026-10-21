@@ -64,4 +64,5 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "user.suspend": "Compte suspendu",
   "user.reactivate": "Compte réactivé",
   "photo.upload": "Photo envoyée",
+  "catalogue.import": "Catalogue importé",
 };

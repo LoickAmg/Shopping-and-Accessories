@@ -8,6 +8,7 @@ import { CONDITION_LABELS, DEPARTMENT_LABELS, variantLabel } from "@/lib/taxonom
 
 import { escapeLike, productStock } from "./catalog";
 import { recordMovement } from "./stock";
+import { notifyLowStock } from "./stock-alerts";
 
 export interface VariantInput {
   /** Déclinaison existante à mettre à jour ; absent pour une nouvelle. */
@@ -148,24 +149,26 @@ export async function createProduct(db: Db, input: ProductInput, actorId: string
   const variants = checkVariants(input.variants);
   const slug = await uniqueProductSlug(db, input.slug || input.name);
   const categoryName = await categoryNameOf(db, input.categoryId);
-  return db.transaction(async (rawTx) => {
+  const row = await db.transaction(async (rawTx) => {
     const tx = rawTx as unknown as Db;
-    const [row] = await tx
+    const [created] = await tx
       .insert(products)
       .values({ ...productColumns(input), slug, searchText: searchTextOf({ ...input, colors: variants.map((v) => v.color) }, categoryName) })
       .returning();
-    await syncVariants(tx, row.id, variants, actorId);
-    return row;
+    await syncVariants(tx, created.id, variants, actorId);
+    return created;
   });
+  if (variants.some((variant) => variant.originalStock != null && variant.stock < variant.originalStock)) void notifyLowStock(db).catch(() => undefined);
+  return row;
 }
 
 export async function updateProduct(db: Db, id: number, input: ProductInput, actorId: string | null = null): Promise<Product | undefined> {
   const variants = checkVariants(input.variants);
   const slug = await uniqueProductSlug(db, input.slug || input.name, id);
   const categoryName = await categoryNameOf(db, input.categoryId);
-  return db.transaction(async (rawTx) => {
+  const row = await db.transaction(async (rawTx) => {
     const tx = rawTx as unknown as Db;
-    const [row] = await tx
+    const [updated] = await tx
       .update(products)
       .set({
         ...productColumns(input),
@@ -175,10 +178,12 @@ export async function updateProduct(db: Db, id: number, input: ProductInput, act
       })
       .where(eq(products.id, id))
       .returning();
-    if (!row) return undefined;
+    if (!updated) return undefined;
     await syncVariants(tx, id, variants, actorId);
-    return row;
+    return updated;
   });
+  if (row && variants.some((variant) => variant.originalStock != null && variant.stock < variant.originalStock)) void notifyLowStock(db).catch(() => undefined);
+  return row;
 }
 
 export async function setProductActive(db: Db, id: number, active: boolean): Promise<void> {

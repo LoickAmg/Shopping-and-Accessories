@@ -737,3 +737,10 @@ tr.is-archived .admin-thumb img { opacity: 0.5; filter: grayscale(1); }
   .admin-stock th:nth-child(3), .admin-stock td:nth-child(3) { display: none; }
   .universe-tabs { margin-top: -1rem; }
 }
+
+/* ---------- import/export du catalogue ---------- */
+.import-export { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.import-panel { flex-basis: 100%; margin-top: 0.8rem; padding: 1rem 1.1rem; border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--white); max-width: 40rem; }
+.import-panel input[type="file"] { display: block; margin: 0.6rem 0; font-size: 0.85rem; }
+.import-errors { margin: 0.6rem 0 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--danger); max-height: 12rem; overflow-y: auto; }
+.import-errors li { margin-bottom: 0.2rem; }

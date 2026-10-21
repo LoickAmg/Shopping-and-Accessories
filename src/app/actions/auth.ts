@@ -16,6 +16,7 @@ import {
 } from "@/server/auth";
 import { mergeGuestCart } from "@/server/cart";
 import { CART_COOKIE, SESSION_COOKIE, cookieOptions, getCartId } from "@/server/context";
+import { checkResetToken, requestPasswordReset, resetPassword } from "@/server/password-reset";
 import { hitRateLimit } from "@/server/rate-limit";
 import { clientFingerprint, fingerprintOf } from "@/server/request";
 
@@ -99,4 +100,49 @@ export async function logoutAction(): Promise<void> {
   await deleteSession(await getDb(), jar.get(SESSION_COOKIE)?.value);
   jar.delete(SESSION_COOKIE);
   redirect("/");
+}
+
+export async function requestPasswordResetAction(_previous: AuthState, formData: FormData): Promise<AuthState> {
+  const raw = Object.fromEntries(formData) as Record<string, string>;
+  const values = { email: raw.email ?? "" };
+
+  const parsed = z.object({ email: emailField }).safeParse(raw);
+  if (!parsed.success) return { errors: fieldErrors(parsed.error), values };
+
+  const db = await getDb();
+  // Même limite que la connexion, par adresse et par visiteur : un jeton de réinitialisation ne doit pas pouvoir être spammé.
+  const [byClient, byAccount] = await Promise.all([
+    hitRateLimit(db, `reset-ip:${clientFingerprint(await headers())}`, { max: 10, windowSeconds: 900 }),
+    hitRateLimit(db, `reset-account:${fingerprintOf(parsed.data.email)}`, { max: 4, windowSeconds: 900 }),
+  ]);
+  if (!byClient.allowed || !byAccount.allowed) {
+    return { message: "Trop de demandes. Réessayez dans quelques minutes.", values };
+  }
+
+  await requestPasswordReset(db, parsed.data.email);
+  // Le message ne change jamais, que l'adresse existe ou non : sinon ce formulaire servirait à deviner les comptes inscrits.
+  return { message: "Si un compte existe avec cette adresse, un lien de réinitialisation vient d'être envoyé.", values };
+}
+
+export async function resetPasswordAction(_previous: AuthState, formData: FormData): Promise<AuthState> {
+  const token = String(formData.get("jeton") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const values = { jeton: token };
+
+  const passwordProblem = validatePassword(password);
+  if (passwordProblem) return { errors: { password: passwordProblem }, values };
+
+  const db = await getDb();
+  const limit = await hitRateLimit(db, `reset-confirm:${clientFingerprint(await headers())}`, { max: 20, windowSeconds: 900 });
+  if (!limit.allowed) return { message: "Trop de tentatives. Réessayez dans quelques minutes.", values };
+
+  const check = await checkResetToken(db, token);
+  if (!check.ok) return { message: "Ce lien n'est plus valable : il a peut-être déjà servi, ou a expiré. Demandez-en un nouveau.", values };
+
+  const done = await resetPassword(db, token, password);
+  if (!done) return { message: "Ce lien n'est plus valable : il a peut-être déjà servi, ou a expiré. Demandez-en un nouveau.", values };
+
+  await deleteSession(db, (await cookies()).get(SESSION_COOKIE)?.value);
+  await openSession(check.userId);
+  redirect("/compte?mot-de-passe-change=1");
 }
