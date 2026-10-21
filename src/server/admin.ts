@@ -1,12 +1,13 @@
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 
 import type { Db } from "@/db/client";
 import { categories, orders, productVariants, products } from "@/db/schema";
 import type { CategoryFamily, Condition, Department, Product, ProductVariant, WearGrade } from "@/db/schema";
-import { buildSearchText, slugify } from "@/lib/slug";
+import { buildSearchText, normalizeForSearch, slugify } from "@/lib/slug";
 import { CONDITION_LABELS, DEPARTMENT_LABELS, variantLabel } from "@/lib/taxonomy";
 
-import { productStock } from "./catalog";
+import { escapeLike, productStock } from "./catalog";
+import { recordMovement } from "./stock";
 
 export interface VariantInput {
   /** Déclinaison existante à mettre à jour ; absent pour une nouvelle. */
@@ -15,6 +16,12 @@ export interface VariantInput {
   color: string;
   sku: string | null;
   stock: number;
+  /**
+   * Stock affiché à l'ouverture du formulaire. S'il est connu, la correction
+   * s'applique en écart (saisi − affiché) : une vente passée entre-temps n'est
+   * pas effacée par l'enregistrement.
+   */
+  originalStock?: number;
 }
 
 export interface ProductInput {
@@ -103,7 +110,7 @@ function productColumns(input: ProductInput) {
 }
 
 /** Remplace les déclinaisons d'un produit par celles du formulaire, sans jamais perdre l'historique. */
-async function syncVariants(tx: Db, productId: number, variants: VariantInput[]): Promise<void> {
+async function syncVariants(tx: Db, productId: number, variants: VariantInput[], actorId: string | null): Promise<void> {
   const existing = await tx.select().from(productVariants).where(eq(productVariants.productId, productId));
   const kept = new Set<number>();
 
@@ -111,13 +118,24 @@ async function syncVariants(tx: Db, productId: number, variants: VariantInput[])
     const match =
       existing.find((row) => variant.id != null && row.id === variant.id) ??
       existing.find((row) => row.size.toLowerCase() === variant.size.toLowerCase() && row.color.toLowerCase() === variant.color.toLowerCase());
-    const values = { size: variant.size, color: variant.color, sku: variant.sku, stock: variant.stock, position, active: true };
+    const values = { size: variant.size, color: variant.color, sku: variant.sku, position, active: true };
     if (match && !kept.has(match.id)) {
       kept.add(match.id);
-      await tx.update(productVariants).set(values).where(eq(productVariants.id, match.id));
+      // Écart voulu par l'équipe, appliqué au stock actuel, jamais en dessous de zéro.
+      const delta = variant.originalStock != null && variant.id === match.id ? variant.stock - variant.originalStock : variant.stock - match.stock;
+      const [updated] = await tx
+        .update(productVariants)
+        .set({ ...values, stock: sql`greatest(${productVariants.stock} + ${delta}, 0)` })
+        .where(eq(productVariants.id, match.id))
+        .returning({ stock: productVariants.stock });
+      await recordMovement(tx, { variantId: match.id, delta: updated.stock - match.stock, stockAfter: updated.stock, reason: "ajustement", actorId });
     } else {
-      const [created] = await tx.insert(productVariants).values({ productId, ...values }).returning({ id: productVariants.id });
+      const [created] = await tx
+        .insert(productVariants)
+        .values({ productId, ...values, stock: variant.stock })
+        .returning({ id: productVariants.id });
       kept.add(created.id);
+      await recordMovement(tx, { variantId: created.id, delta: variant.stock, stockAfter: variant.stock, reason: "ajustement", actorId });
     }
   }
 
@@ -126,7 +144,7 @@ async function syncVariants(tx: Db, productId: number, variants: VariantInput[])
   if (removed.length > 0) await tx.update(productVariants).set({ active: false }).where(inArray(productVariants.id, removed));
 }
 
-export async function createProduct(db: Db, input: ProductInput): Promise<Product> {
+export async function createProduct(db: Db, input: ProductInput, actorId: string | null = null): Promise<Product> {
   const variants = checkVariants(input.variants);
   const slug = await uniqueProductSlug(db, input.slug || input.name);
   const categoryName = await categoryNameOf(db, input.categoryId);
@@ -136,12 +154,12 @@ export async function createProduct(db: Db, input: ProductInput): Promise<Produc
       .insert(products)
       .values({ ...productColumns(input), slug, searchText: searchTextOf({ ...input, colors: variants.map((v) => v.color) }, categoryName) })
       .returning();
-    await syncVariants(tx, row.id, variants);
+    await syncVariants(tx, row.id, variants, actorId);
     return row;
   });
 }
 
-export async function updateProduct(db: Db, id: number, input: ProductInput): Promise<Product | undefined> {
+export async function updateProduct(db: Db, id: number, input: ProductInput, actorId: string | null = null): Promise<Product | undefined> {
   const variants = checkVariants(input.variants);
   const slug = await uniqueProductSlug(db, input.slug || input.name, id);
   const categoryName = await categoryNameOf(db, input.categoryId);
@@ -158,7 +176,7 @@ export async function updateProduct(db: Db, id: number, input: ProductInput): Pr
       .where(eq(products.id, id))
       .returning();
     if (!row) return undefined;
-    await syncVariants(tx, id, variants);
+    await syncVariants(tx, id, variants, actorId);
     return row;
   });
 }
@@ -167,12 +185,122 @@ export async function setProductActive(db: Db, id: number, active: boolean): Pro
   await db.update(products).set({ active, updatedAt: sql`now()` }).where(eq(products.id, id));
 }
 
-export async function listProductsForAdmin(db: Db) {
-  return db
-    .select({ product: products, stock: productStock, categoryName: categories.name })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .orderBy(desc(products.active), asc(products.name));
+export const ADMIN_PRODUCTS_PAGE_SIZE = 40;
+
+export interface AdminProductFilter {
+  q?: string;
+  categoryId?: number | "aucun";
+  status?: "en-vente" | "archives";
+  /** `rupture` : plus rien à vendre ; `bas` : au moins une taille sous le seuil d'alerte. */
+  stock?: "rupture" | "bas";
+  page?: number;
+}
+
+/** Liste du back-office : recherche (nom, textes, référence), filtres et pagination. */
+export async function listProductsForAdmin(db: Db, filter: AdminProductFilter = {}) {
+  const conditions = [];
+  // Chaque mot doit se retrouver quelque part : « robe lin » trouve « Robe portefeuille, lin bleu ».
+  const words = normalizeForSearch((filter.q ?? "").trim()).split(/\s+/).filter(Boolean).slice(0, 6);
+  for (const word of words) {
+    const pattern = `%${escapeLike(word)}%`;
+    conditions.push(
+      or(
+        ilike(products.searchText, pattern),
+        ilike(products.sku, pattern),
+        ilike(products.slug, pattern),
+        sql`exists (select 1 from ${productVariants} v where v.product_id = ${products.id} and v.sku ilike ${pattern})`,
+      ),
+    );
+  }
+  if (filter.categoryId === "aucun") conditions.push(sql`${products.categoryId} is null`);
+  else if (filter.categoryId) conditions.push(eq(products.categoryId, filter.categoryId));
+  if (filter.status === "en-vente") conditions.push(eq(products.active, true));
+  if (filter.status === "archives") conditions.push(eq(products.active, false));
+  if (filter.stock === "rupture") conditions.push(sql`${productStock} <= 0`);
+  if (filter.stock === "bas") {
+    conditions.push(
+      sql`exists (select 1 from ${productVariants} v where v.product_id = ${products.id} and v.active and v.stock > 0 and v.stock <= ${LOW_STOCK_THRESHOLD})`,
+    );
+  }
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const page = Math.max(1, filter.page ?? 1);
+
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({ product: products, stock: productStock, categoryName: categories.name })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(where)
+      .orderBy(desc(products.active), desc(products.updatedAt), asc(products.name))
+      .limit(ADMIN_PRODUCTS_PAGE_SIZE)
+      .offset((page - 1) * ADMIN_PRODUCTS_PAGE_SIZE),
+    db.select({ total: count() }).from(products).where(where),
+  ]);
+  return { rows, total };
+}
+
+/**
+ * Copie un produit pour en créer un proche (autre coloris, autre pièce de
+ * friperie) : textes, prix, classement, photos et tailles sont repris ; la
+ * copie part hors vente, avec un stock à zéro, le temps de la compléter.
+ */
+export async function duplicateProduct(db: Db, id: number): Promise<Product | undefined> {
+  const source = await getProductForAdmin(db, id);
+  if (!source) return undefined;
+  const name = `${source.name} (copie)`.slice(0, 160);
+  const slug = await uniqueProductSlug(db, `${source.slug}-copie`);
+  return db.transaction(async (rawTx) => {
+    const tx = rawTx as unknown as Db;
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, variants, ...columns } = source;
+    void _id;
+    void _createdAt;
+    void _updatedAt;
+    const [row] = await tx
+      .insert(products)
+      .values({ ...columns, name, slug, active: false, sku: null })
+      .returning();
+    const copies = variants.length > 0 ? variants : [{ size: "", color: "" }];
+    await tx
+      .insert(productVariants)
+      .values(copies.map((variant, position) => ({ productId: row.id, size: variant.size, color: variant.color, sku: null, stock: 0, position })));
+    return row;
+  });
+}
+
+/** Résumé lisible des champs modifiés, pour le journal d'activité. */
+export function describeProductChanges(before: AdminProduct, input: ProductInput): string[] {
+  const changes: string[] = [];
+  const fields: [keyof ProductInput & keyof Product, string][] = [
+    ["name", "nom"],
+    ["summary", "résumé"],
+    ["description", "description"],
+    ["categoryId", "rayon"],
+    ["priceCents", "prix"],
+    ["compareAtCents", "prix barré"],
+    ["department", "univers"],
+    ["condition", "état"],
+    ["material", "matière"],
+    ["imageUrl", "photo principale"],
+  ];
+  for (const [field, label] of fields) {
+    if ((before[field] ?? null) !== (input[field] ?? null)) changes.push(label);
+  }
+  if (before.gallery.join("|") !== input.gallery.join("|")) changes.push("photos");
+  if (before.active !== input.active) changes.push(input.active ? "remis en vente" : "retiré de la vente");
+  for (const variant of input.variants) {
+    const previous = before.variants.find((row) => row.id === variant.id);
+    const label = variantLabel(variant) || "stock";
+    if (!previous) {
+      changes.push(`ajout ${label} (${variant.stock})`);
+      continue;
+    }
+    const shown = variant.originalStock ?? previous.stock;
+    if (variant.stock !== shown) changes.push(`${label} ${shown} → ${variant.stock}`);
+  }
+  for (const row of before.variants) {
+    if (!input.variants.some((variant) => variant.id === row.id)) changes.push(`retrait ${variantLabel(row) || "déclinaison"}`);
+  }
+  return changes;
 }
 
 export interface AdminProduct extends Product {

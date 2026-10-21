@@ -149,6 +149,8 @@ export async function getSessionUser(db: Db, token: string | undefined): Promise
     .where(eq(sessions.id, hashToken(token)))
     .limit(1);
   if (!row || row.expiresAt.getTime() <= Date.now()) return null;
+  // Un compte suspendu perd l'accès immédiatement, même avec une session encore valide.
+  if (row.user.suspendedAt) return null;
   return row.user;
 }
 

@@ -11,7 +11,8 @@ export const MAX_VARIANT_ROWS = 60;
 
 /**
  * Lit les lignes de déclinaison du formulaire : `variant_size_<n>`,
- * `variant_color_<n>`, `variant_stock_<n>`, `variant_sku_<n>`, `variant_id_<n>`.
+ * `variant_color_<n>`, `variant_stock_<n>`, `variant_sku_<n>`, `variant_id_<n>`, et
+ * `variant_orig_<n>` (stock affiché à l'ouverture du formulaire).
  * Une ligne entièrement vide est ignorée ; un stock qui n'est pas un entier
  * positif arrête la lecture avec un message.
  */
@@ -33,7 +34,10 @@ export function parseVariantRows(raw: Record<string, string>): { variants: Varia
       return { variants, error: `Stock invalide pour la déclinaison ${size || color || index + 1} : nombre entier positif attendu.` };
     }
     const id = Number(raw[`variant_id_${index}`]);
-    variants.push({ id: Number.isInteger(id) && id > 0 ? id : undefined, size, color, sku: sku || null, stock });
+    const known = Number.isInteger(id) && id > 0;
+    const originalRaw = (raw[`variant_orig_${index}`] ?? "").trim();
+    const originalStock = known && /^\d{1,7}$/.test(originalRaw) ? Number(originalRaw) : undefined;
+    variants.push({ id: known ? id : undefined, size, color, sku: sku || null, stock, originalStock });
   }
   return { variants };
 }

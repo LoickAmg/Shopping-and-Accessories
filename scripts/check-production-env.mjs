@@ -21,6 +21,11 @@ if (env("STRIPE_SECRET_KEY").startsWith("sk_live_") && env("ALLOW_LIVE_PAYMENTS"
   problems.push("Clé Stripe de production détectée : confirmez avec ALLOW_LIVE_PAYMENTS=true.");
 }
 
+if (!env("BLOB_READ_WRITE_TOKEN")) {
+  // Pas bloquant : la boutique fonctionne, seul l'envoi de photos depuis le back-office est indisponible.
+  console.warn("BLOB_READ_WRITE_TOKEN absent : l'envoi de photos depuis l'administration sera refusé (créez un store Vercel Blob).");
+}
+
 if (problems.length > 0) {
   console.error("Configuration de production incomplète :\n- " + problems.join("\n- "));
   process.exit(1);

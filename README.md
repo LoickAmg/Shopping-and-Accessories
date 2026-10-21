@@ -45,11 +45,14 @@ Les animations respectent le réglage « réduire les animations » du système.
 - **Commande** : validation côté serveur, adresse, choix du paiement, acceptation des conditions de vente.
 - **Stock** : il est réservé dans une transaction (`UPDATE … WHERE stock >= quantité`), donc deux acheteurs ne peuvent pas se partager la dernière pièce. Une commande impayée expire après 30 minutes (réglable) et rend son stock.
 - **Comptes clients** : inscription, connexion et historique des commandes. Les mots de passe sont hachés avec `scrypt`.
-- **Back-office** (`/admin`, réservé au compte dont l'e-mail est `ADMIN_EMAIL`) :
-  - tableau de bord ;
-  - produits (créer, modifier, archiver) et rayons ;
-  - commandes : expédier, annuler, enregistrer un paiement reçu hors ligne, solder un remboursement ;
-  - devises.
+- **Back-office** (`/admin`, réservé à l'équipe) :
+  - tableau de bord (ventes, ruptures, stock bas, remboursements à faire) ;
+  - produits : recherche, filtres (rayon, statut, stock), création, modification, duplication, archivage ;
+  - photos envoyées depuis le téléphone ou l'ordinateur (réduites dans le navigateur, puis stockées sur Vercel Blob), réordonnables ;
+  - stock : correction rapide de toutes les tailles sur une seule page, et historique des mouvements (corrections, ventes, retours au stock) ;
+  - rayons, commandes (expédier, annuler, encaisser hors ligne, solder un remboursement) et devises ;
+  - équipe : rôles Gestionnaire et Administrateur, suspension d'un compte, et journal d'activité (qui a fait quoi, quand).
+- **Rôles** : le *gestionnaire* gère produits, photos, stock, rayons et commandes ; l'*administrateur* a en plus les encaissements et remboursements, les devises, les comptes et le journal. La boutique garde toujours au moins un administrateur actif.
 - **Pages légales** : mentions légales, conditions de vente, confidentialité, livraison et retours, contact, à propos. L'identité du vendeur vient des variables d'environnement.
 - **Accessibilité et référencement** : navigation au clavier, lien d'évitement, formulaires étiquetés avec erreurs annoncées, `robots.txt`, `sitemap.xml`, Open Graph.
 
@@ -135,7 +138,8 @@ tests/                 Tests Vitest
 2. **Projet** : importez ce dépôt dans Vercel. Le script `vercel-build` applique les migrations, puis construit le site.
 3. **Variables** : renseignez-les dans *Settings → Environment Variables* (voir la section suivante). Sans les variables obligatoires, le build échoue volontairement.
 4. **Catalogue** : sur une base de production vide, posez `SEED_DEMO_CATALOG=true` pour charger le catalogue de démonstration au premier déploiement. Vous pouvez aussi lancer `npm run db:seed` avec `DATABASE_URL`, ou créer directement vos produits dans `/admin`.
-5. **Administration** : ouvrez le site et inscrivez-vous avec l'adresse `ADMIN_EMAIL`.
+5. **Administration** : ouvrez le site et inscrivez-vous avec l'adresse `ADMIN_EMAIL` : ce premier compte devient administrateur. Les autres membres de l'équipe créent leur compte sur le site, puis un administrateur leur donne un rôle dans *Admin → Équipe et comptes*.
+6. **Photos** : dans Vercel, *Storage → Create → Blob*, puis reliez le store au projet. La variable `BLOB_READ_WRITE_TOKEN` est ajoutée toute seule ; redéployez. Sans elle, l'envoi de photos est refusé en production (en local, les photos vont dans `public/uploads/`).
 
 ## Variables d'environnement
 
@@ -160,6 +164,7 @@ Le fichier `.env.example` liste toutes les variables, avec un commentaire pour c
 | `SHOP_DEMO_NOTICE` | `false` pour passer en vente réelle |
 | `PAYMENT_PROVIDERS` | `demo`, `stripe`, ou les deux |
 | `RESEND_API_KEY`, `MAIL_FROM` | Envoi réel des e-mails de confirmation |
+| `BLOB_READ_WRITE_TOKEN` | Stockage des photos envoyées depuis le back-office (Vercel Blob) |
 | `SITE_URL` | URL publique (déduite automatiquement sur Vercel) |
 
 Pour générer `APP_SECRET` :
@@ -198,7 +203,10 @@ Un sélecteur apparaît alors dans l'en-tête. Le client est facturé dans la de
 
 ## Sécurité
 
-- Chaque page et chaque action du back-office vérifie elle-même le rôle d'administrateur. Le layout `/admin` ne suffit pas : Next.js rend les pages en parallèle du layout, et une page non protégée enverrait ses données même quand le layout redirige. Un test (`tests/admin-guard.test.ts`) échoue si une page ou une action oublie cette vérification.
+- Chaque page et chaque action du back-office vérifie elle-même le rôle (`requireStaff` ou `requireAdmin`). Le layout `/admin` ne suffit pas : Next.js rend les pages en parallèle du layout, et une page non protégée enverrait ses données même quand le layout redirige. Un test (`tests/admin-guard.test.ts`) échoue si une page ou une action oublie cette vérification, ou si une page réservée à l'administrateur se contente du rôle gestionnaire.
+- Un compte suspendu perd immédiatement ses sessions. Un administrateur ne peut ni modifier son propre rôle ni retirer le dernier administrateur actif (vérifié dans la même requête SQL que la modification).
+- L'envoi de photos vérifie le rôle, l'origine de la requête, la taille (4 Mo) et le type réel du fichier, lu dans ses premiers octets (JPEG, PNG ou WebP seulement).
+- Les corrections de stock s'appliquent en écart (saisi − affiché) : une vente passée pendant que la page était ouverte n'est jamais effacée.
 - Les sessions utilisent un jeton haché et les mots de passe sont hachés avec `scrypt`.
 - Une limitation de débit en base protège la connexion, l'inscription et la commande, sans stocker d'adresse IP ni d'e-mail en clair.
 - Les redirections de retour sont limitées aux chemins internes. Une commande n'est consultable sans compte qu'avec son jeton secret.

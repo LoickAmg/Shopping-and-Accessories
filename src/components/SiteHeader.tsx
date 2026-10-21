@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { store } from "@/config/store";
+import type { UserRole } from "@/db/schema";
+import { isStaff } from "@/lib/roles";
 
 import { CurrencySwitcher } from "./CurrencySwitcher";
 import { HeaderSearch } from "./HeaderSearch";
@@ -8,7 +10,7 @@ import { PillNav } from "./PillNav";
 
 interface Props {
   cartCount: number;
-  user: { name: string; role: "customer" | "admin" } | null;
+  user: { name: string; role: UserRole } | null;
   currencies: { code: string }[];
   currentCurrency: string;
 }
@@ -28,7 +30,7 @@ export function SiteHeader({ cartCount, user, currencies, currentCurrency }: Pro
       <div className="header-tools">
         <HeaderSearch />
         <CurrencySwitcher currencies={currencies} current={currentCurrency} />
-        {user?.role === "admin" && (
+        {isStaff(user?.role) && (
           <Link href="/admin" className="header-link">
             Admin
           </Link>

@@ -118,6 +118,13 @@ export const productVariants = pgTable(
   ],
 );
 
+/**
+ * Rôles : client, gestionnaire (catalogue, stock et commandes) et
+ * administrateur (tout, y compris l'argent, les devises, les comptes et le journal).
+ */
+export const USER_ROLES = ["customer", "manager", "admin"] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
 export const users = pgTable(
   "users",
   {
@@ -125,7 +132,9 @@ export const users = pgTable(
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
     name: text("name").notNull().default(""),
-    role: text("role", { enum: ["customer", "admin"] }).notNull().default("customer"),
+    role: text("role", { enum: USER_ROLES }).notNull().default("customer"),
+    /** Compte suspendu : plus de connexion possible, sessions supprimées. */
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("users_email_unique").on(table.email)],
@@ -265,6 +274,53 @@ export const currencies = pgTable("currencies", {
 });
 
 export type Currency = typeof currencies.$inferSelect;
+
+/**
+ * Journal d'activité du back-office : qui a fait quoi, et quand. L'adresse de
+ * l'auteur est copiée : la ligne reste lisible si le compte disparaît.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: serial("id").primaryKey(),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    actorEmail: text("actor_email").notNull(),
+    /** Identifiant stable de l'action (`product.update`, `user.role`…). */
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull().default(""),
+    targetId: text("target_id").notNull().default(""),
+    /** Phrase lisible : « Robe portefeuille : prix, stock M (3 → 5) ». */
+    summary: text("summary").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("audit_log_created_idx").on(table.createdAt), index("audit_log_actor_idx").on(table.actorId)],
+);
+
+/** Raison d'un mouvement de stock : correction à la main, vente, ou retour au stock (commande annulée ou expirée). */
+export const STOCK_REASONS = ["ajustement", "vente", "restitution"] as const;
+export type StockReason = (typeof STOCK_REASONS)[number];
+
+/** Historique des mouvements de stock, déclinaison par déclinaison. */
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: serial("id").primaryKey(),
+    variantId: integer("variant_id")
+      .notNull()
+      .references(() => productVariants.id, { onDelete: "cascade" }),
+    delta: integer("delta").notNull(),
+    /** Stock après le mouvement, quand il est connu. */
+    stockAfter: integer("stock_after"),
+    reason: text("reason", { enum: STOCK_REASONS }).notNull(),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("stock_movements_variant_idx").on(table.variantId), index("stock_movements_created_idx").on(table.createdAt)],
+);
+
+export type AuditEntry = typeof auditLog.$inferSelect;
+export type StockMovement = typeof stockMovements.$inferSelect;
 
 export interface ShippingAddress {
   line1: string;

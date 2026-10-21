@@ -7,14 +7,15 @@ import { COUNTRY_NAMES, store } from "@/config/store";
 import { getDb } from "@/db/client";
 import { STATUS_LABELS, formatDate, orderMoney } from "@/lib/format";
 import { getOrder } from "@/server/orders";
-import { requireAdmin } from "@/server/guard";
+import { can } from "@/lib/roles";
+import { requireStaff } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Commande" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function AdminOrderPage({ params }: PageProps<"/admin/commandes/[id]">) {
-  await requireAdmin();
+  const user = await requireStaff();
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const order = await getOrder(await getDb(), id);
@@ -89,7 +90,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/comma
                 </button>
               </form>
             )}
-            {refundDue && (
+            {refundDue && can(user.role, "paiements") && (
               <form action={orderAdminAction}>
                 <input type="hidden" name="orderId" value={order.id} />
                 <button type="submit" name="action" value="refund" className="button button-quiet">
@@ -99,7 +100,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/comma
             )}
           </div>
 
-          {(order.status === "pending" || order.status === "expired") && (
+          {(order.status === "pending" || order.status === "expired") && can(user.role, "paiements") && (
             <form action={orderAdminAction} className="stack" style={{ marginTop: "var(--space-5)", maxWidth: "26rem" }}>
               <h3>Paiement reçu hors ligne</h3>
               <p className="muted small">Virement, espèces ou mobile money reçu directement : la commande passe en « payée ».</p>

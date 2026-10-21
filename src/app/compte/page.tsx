@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { getDb } from "@/db/client";
 import { STATUS_LABELS, formatDate, orderMoney } from "@/lib/format";
+import { isStaff } from "@/lib/roles";
 import { getCurrentUser } from "@/server/context";
 import { listOrdersForUser } from "@/server/orders";
 
@@ -72,7 +73,7 @@ export default async function AccountPage() {
         </div>
       )}
 
-      {user.role === "admin" && (
+      {isStaff(user.role) && (
         <p style={{ marginTop: "var(--space-6)" }}>
           <Link href="/admin">Ouvrir l&apos;administration</Link>
         </p>

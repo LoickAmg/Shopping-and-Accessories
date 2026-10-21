@@ -100,7 +100,7 @@ function toItem(row: ListRow): ProductListItem {
 }
 
 /** Échappe les jokers de LIKE pour qu'une recherche « 100% » cherche bien « 100% ». */
-function escapeLike(value: string): string {
+export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 

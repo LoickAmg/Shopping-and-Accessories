@@ -4,12 +4,12 @@ import { deleteCategoryAction } from "@/app/actions/admin";
 import { CategoryForm } from "@/components/CategoryForm";
 import { getDb } from "@/db/client";
 import { countByCategory, listCategories } from "@/server/catalog";
-import { requireAdmin } from "@/server/guard";
+import { requireStaff } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Rayons" };
 
 export default async function AdminCategoriesPage({ searchParams }: PageProps<"/admin/categories">) {
-  await requireAdmin();
+  await requireStaff();
   const query = await searchParams;
   const db = await getDb();
   const [categories, counts] = await Promise.all([listCategories(db), countByCategory(db)]);
@@ -35,6 +35,7 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
                 <CategoryForm initial={{ id: category.id, name: category.name, description: category.description, family: category.family, position: category.position }} />
                 <form action={deleteCategoryAction}>
                   <input type="hidden" name="id" value={category.id} />
+                  <input type="hidden" name="name" value={category.name} />
                   <button type="submit" className="link-button">
                     Supprimer ce rayon
                   </button>

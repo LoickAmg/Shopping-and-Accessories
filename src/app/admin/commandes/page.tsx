@@ -6,12 +6,12 @@ import { ORDER_STATUSES } from "@/db/schema";
 import type { OrderStatus } from "@/db/schema";
 import { STATUS_LABELS, formatDate, orderMoney } from "@/lib/format";
 import { listOrders } from "@/server/orders";
-import { requireAdmin } from "@/server/guard";
+import { requireStaff } from "@/server/guard";
 
 export const metadata: Metadata = { title: "Commandes" };
 
 export default async function AdminOrdersPage({ searchParams }: PageProps<"/admin/commandes">) {
-  await requireAdmin();
+  await requireStaff();
   const query = await searchParams;
   const stateParam = Array.isArray(query.etat) ? query.etat[0] : query.etat;
   const status = (ORDER_STATUSES as readonly string[]).includes(stateParam ?? "") ? (stateParam as OrderStatus) : undefined;

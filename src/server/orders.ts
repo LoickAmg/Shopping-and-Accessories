@@ -10,6 +10,7 @@ import type { RateTarget } from "@/lib/currency";
 import { variantLabel } from "@/lib/taxonomy";
 
 import { computeTotals } from "./pricing";
+import { recordMovement } from "./stock";
 import type { ShippingRules } from "./pricing";
 
 export interface OrderWithItems extends Order {
@@ -89,18 +90,18 @@ export async function createOrder(db: Db, input: CreateOrderInput): Promise<Orde
 
     if (lines.length === 0) throw new EmptyCartError();
 
-    const reserved: { productId: number; variantId: number; name: string; variantLabel: string; unitPriceCents: number; quantity: number }[] = [];
+    const reserved: { productId: number; variantId: number; name: string; variantLabel: string; unitPriceCents: number; quantity: number; stockAfter: number }[] = [];
     const missing: string[] = [];
     const convert = input.convert;
 
     for (const line of lines) {
       const label = variantLabel(line);
-      const reservedOk = await takeStock(tx, line.variantId, line.quantity);
-      if (reservedOk) {
+      const stockAfter = await takeStock(tx, line.variantId, line.quantity);
+      if (stockAfter != null) {
         // Le prix est relu dans la même transaction : jamais celui d'un formulaire.
         const [product] = await tx.select({ priceCents: products.priceCents }).from(products).where(eq(products.id, line.productId)).limit(1);
         const unitPriceCents = convert ? convertMinor(product.priceCents, convert, convert.baseExponent) : product.priceCents;
-        reserved.push({ productId: line.productId, variantId: line.variantId, name: line.name, variantLabel: label, unitPriceCents, quantity: line.quantity });
+        reserved.push({ productId: line.productId, variantId: line.variantId, name: line.name, variantLabel: label, unitPriceCents, quantity: line.quantity, stockAfter });
       } else {
         missing.push(label ? `${line.name} (${label})` : line.name);
       }
@@ -151,6 +152,9 @@ export async function createOrder(db: Db, input: CreateOrderInput): Promise<Orde
       )
       .returning();
 
+    for (const item of reserved) {
+      await recordMovement(tx, { variantId: item.variantId, delta: -item.quantity, stockAfter: item.stockAfter, reason: "vente", orderId: order.id });
+    }
     await tx.delete(cartItems).where(eq(cartItems.cartId, input.cartId));
     return { ...order, items };
   });
@@ -160,8 +164,9 @@ export async function createOrder(db: Db, input: CreateOrderInput): Promise<Orde
  * Retire `quantity` du stock d'une déclinaison, en une seule instruction :
  * le test « assez de stock, article actif » et le retrait sont indivisibles,
  * deux acheteurs ne peuvent donc jamais se partager la dernière pièce.
+ * Renvoie le stock restant, ou `null` si le retrait est impossible.
  */
-async function takeStock(tx: Tx, variantId: number, quantity: number): Promise<boolean> {
+async function takeStock(tx: Tx, variantId: number, quantity: number): Promise<number | null> {
   const rows = await tx
     .update(productVariants)
     .set({ stock: sql`${productVariants.stock} - ${quantity}` })
@@ -173,8 +178,8 @@ async function takeStock(tx: Tx, variantId: number, quantity: number): Promise<b
         sql`exists (select 1 from ${products} where ${products.id} = ${productVariants.productId} and ${products.active})`,
       ),
     )
-    .returning({ id: productVariants.id });
-  return rows.length > 0;
+    .returning({ id: productVariants.id, stock: productVariants.stock });
+  return rows[0]?.stock ?? null;
 }
 
 /** Restitue au stock les quantités d'une commande. */
@@ -183,6 +188,12 @@ async function restock(tx: Tx, orderId: string): Promise<void> {
     update product_variants v set stock = v.stock + oi.quantity
     from order_items oi
     where oi.order_id = ${orderId} and oi.variant_id = v.id
+  `);
+  await tx.execute(sql`
+    insert into stock_movements (variant_id, delta, stock_after, reason, order_id)
+    select oi.variant_id, oi.quantity, v.stock, 'restitution', ${orderId}
+    from order_items oi join product_variants v on v.id = oi.variant_id
+    where oi.order_id = ${orderId} and oi.quantity > 0
   `);
 }
 
@@ -241,7 +252,9 @@ export async function markOrderPaid(db: Db, orderId: string, payment: { referenc
       const tx = rawTx as unknown as Tx;
       const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId)).orderBy(asc(orderItems.variantId));
       for (const item of items) {
-        if (item.variantId == null || !(await takeStock(tx, item.variantId, item.quantity))) throw new LateStockError();
+        const stockAfter = item.variantId == null ? null : await takeStock(tx, item.variantId, item.quantity);
+        if (item.variantId == null || stockAfter == null) throw new LateStockError();
+        await recordMovement(tx, { variantId: item.variantId, delta: -item.quantity, stockAfter, reason: "vente", orderId });
       }
       await tx
         .update(orders)

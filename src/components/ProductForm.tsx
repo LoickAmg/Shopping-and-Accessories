@@ -5,8 +5,12 @@ import { useActionState, useState } from "react";
 import { saveProductAction } from "@/app/actions/admin";
 import type { AdminFormState } from "@/app/actions/admin";
 
+import { PhotoManager } from "./PhotoManager";
+
 export interface VariantRowValues {
   id?: number;
+  /** Stock en base à l'ouverture du formulaire : la correction s'applique en écart. */
+  original?: string;
   size: string;
   color: string;
   stock: string;
@@ -100,6 +104,7 @@ function rowsFromValues(values: Record<string, string>): Row[] {
     .map((index) =>
       withKey({
         id: Number(values[`variant_id_${index}`]) || undefined,
+        original: values[`variant_orig_${index}`],
         size: values[`variant_size_${index}`] ?? "",
         color: values[`variant_color_${index}`] ?? "",
         stock: values[`variant_stock_${index}`] ?? "",
@@ -115,6 +120,7 @@ export function ProductForm({ initial, categories, currencyCode, exponent }: Pro
 
   const [rows, setRows] = useState<Row[]>(() => (initial.variants.length > 0 ? initial.variants.map(withKey) : [emptyRow()]));
   const [condition, setCondition] = useState(initial.condition);
+  const [uploading, setUploading] = useState(false);
   // Une erreur serveur réaffiche ce que l'administrateur avait saisi.
   const [restoredFrom, setRestoredFrom] = useState<Record<string, string> | undefined>(undefined);
   if (v && v !== restoredFrom) {
@@ -311,6 +317,7 @@ export function ProductForm({ initial, categories, currencyCode, exponent }: Pro
           {rows.map((row, index) => (
             <div className="variant-row" role="row" key={row.key}>
               {row.id != null && <input type="hidden" name={`variant_id_${index}`} value={row.id} />}
+              {row.id != null && row.original != null && <input type="hidden" name={`variant_orig_${index}`} value={row.original} />}
               <input
                 aria-label={`Taille, ligne ${index + 1}`}
                 name={`variant_size_${index}`}
@@ -368,39 +375,11 @@ export function ProductForm({ initial, categories, currencyCode, exponent }: Pro
 
       <fieldset className="form-group">
         <legend>Photos et présentation</legend>
-        <div className="field">
-          <label htmlFor="imageUrl">Photo principale (facultatif)</label>
-          {/* type="text" : un champ « url » refuserait les chemins du site comme /assets/sac.jpeg. */}
-          <input
-            id="imageUrl"
-            name="imageUrl"
-            type="text"
-            inputMode="url"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="/assets/robe.jpeg ou https://…"
-            defaultValue={text("imageUrl")}
-            {...invalid("imageUrl")}
-            aria-describedby={errors.imageUrl ? "imageUrl-error imageUrl-hint" : "imageUrl-hint"}
-          />
-          <p className="field-hint" id="imageUrl-hint">
-            Une photo du site (déposée dans <code>public/assets/</code>) ou une adresse en https://. Sur fond blanc, le vêtement paraît détouré.
-          </p>
-          {err("imageUrl")}
-        </div>
-        <div className="field">
-          <label htmlFor="gallery">Photos supplémentaires (facultatif, une par ligne)</label>
-          <textarea
-            id="gallery"
-            name="gallery"
-            defaultValue={text("gallery")}
-            spellCheck={false}
-            placeholder={"/assets/robe-dos.jpeg\n/assets/robe-detail.jpeg"}
-            {...invalid("gallery")}
-          />
-          <p className="field-hint">Dos, détails, porté, défauts éventuels : 8 au maximum.</p>
-          {err("gallery")}
-        </div>
+        <PhotoManager
+          initial={[text("imageUrl"), ...text("gallery").split("\n")].map((url) => url.trim()).filter(Boolean)}
+          error={errors.imageUrl ?? errors.gallery}
+          onBusyChange={setUploading}
+        />
         <div className="field-row">
           <div className="field">
             <label htmlFor="tone">Fond de la carte</label>
@@ -426,8 +405,8 @@ export function ProductForm({ initial, categories, currencyCode, exponent }: Pro
       </div>
 
       <div className="actions">
-        <button type="submit" className="button" disabled={pending}>
-          {pending ? "Enregistrement…" : "Enregistrer"}
+        <button type="submit" className="button" disabled={pending || uploading}>
+          {pending ? "Enregistrement…" : uploading ? "Envoi des photos…" : "Enregistrer"}
         </button>
       </div>
     </form>

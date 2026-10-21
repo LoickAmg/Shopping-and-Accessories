@@ -88,6 +88,7 @@ export async function loginAction(_previous: AuthState, formData: FormData): Pro
 
   const user = await authenticate(db, parsed.data.email, parsed.data.password);
   if (!user) return { message: "E-mail ou mot de passe incorrect.", values };
+  if (user.suspendedAt) return { message: "Ce compte est suspendu. Contactez l'administrateur de la boutique.", values };
 
   await openSession(user.id);
   redirect(safeReturnPath(raw.retour));

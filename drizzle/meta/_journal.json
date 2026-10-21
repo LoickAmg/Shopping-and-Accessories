@@ -36,6 +36,13 @@
       "when": 1792018541319,
       "tag": "0004_rayons_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792605055575,
+      "tag": "0005_gestion_equipe_et_stock",
+      "breakpoints": true
     }
   ]
 }

@@ -4,10 +4,10 @@ import { getDb } from "@/db/client";
 import { money } from "@/lib/format";
 import { getDashboardStats } from "@/server/admin";
 import { sweepExpiredOrders } from "@/server/context";
-import { requireAdmin } from "@/server/guard";
+import { requireStaff } from "@/server/guard";
 
-export default async function AdminDashboard() {
-  await requireAdmin();
+export default async function AdminDashboard({ searchParams }: PageProps<"/admin">) {
+  await requireStaff();
   const db = await getDb();
   await sweepExpiredOrders();
   const stats = await getDashboardStats(db);
@@ -15,6 +15,12 @@ export default async function AdminDashboard() {
   return (
     <>
       <h1>Tableau de bord</h1>
+
+      {(await searchParams).interdit && (
+        <p className="notice notice-error" role="alert">
+          Cette page est réservée à l&apos;administrateur de la boutique.
+        </p>
+      )}
 
       {stats.refundsDue > 0 && (
         <p className="notice notice-error" role="alert">
@@ -42,11 +48,18 @@ export default async function AdminDashboard() {
         </div>
         <div>
           <dt>Ruptures</dt>
-          <dd>{stats.outOfStock}</dd>
+          <dd>
+            <Link href="/admin/produits?stock=rupture&statut=en-vente">{stats.outOfStock}</Link>
+          </dd>
         </div>
       </dl>
 
-      <h2>Stock bas</h2>
+      <div className="page-head" style={{ borderBottom: 0, paddingBottom: 0, marginBottom: "var(--space-4)" }}>
+        <h2 style={{ margin: 0 }}>Stock bas</h2>
+        <Link href="/admin/stock?niveau=bas" className="small">
+          Tout corriger dans la page Stock →
+        </Link>
+      </div>
       {stats.lowStock.length === 0 ? (
         <p className="muted">Aucun produit sous le seuil d&apos;alerte.</p>
       ) : (
